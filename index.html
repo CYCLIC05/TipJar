@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TipJar - Support Creators</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <div id="app">
+    <!-- Premium Modal Overlay -->
+    <div id="withdraw-modal" class="modal-overlay" onclick="closeModal(event)">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <div style="text-align: center;">
+          <div style="width: 60px; height: 60px; background: #FFFBEB; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; color: #F79F1A;">
+            <i data-lucide="wallet" style="width: 32px; height: 32px;"></i>
+          </div>
+          <h2 style="font-size: 24px; margin-bottom: 12px;">Confirm Withdrawal</h2>
+          <p style="color: #6B7280; font-size: 15px; margin-bottom: 32px;">You are about to withdraw <strong>$2,450.12</strong> to your connected Ethereum wallet.</p>
+          
+          <div style="background: #F9FAFB; padding: 20px; border-radius: 20px; text-align: left; margin-bottom: 32px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span style="color: #6B7280; font-size: 14px;">Wallet Address</span>
+              <span style="font-family: monospace; font-size: 14px; font-weight: 600;">0x71C...39A2</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: #6B7280; font-size: 14px;">Network Fee</span>
+              <span style="color: #10B981; font-size: 14px; font-weight: 600;">Free</span>
+            </div>
+          </div>
+
+          <button class="btn-primary" onclick="confirmWithdraw()">Confirm & Payout</button>
+          <button style="background: none; border: none; color: #9CA3AF; font-weight: 600; margin-top: 20px; cursor: pointer;" onclick="closeModal()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qr-modal" class="modal-overlay" onclick="closeQRModal()">
+      <div class="modal-content" onclick="event.stopPropagation()">
+        <div style="text-align: center;">
+          <h2 style="font-size: 24px; margin-bottom: 8px;">Your TipJar QR</h2>
+          <p style="color: #6B7280; font-size: 14px; margin-bottom: 24px;">Print or share this to receive tips offline</p>
+          
+          <div style="background: white; padding: 24px; border-radius: 24px; border: 1px solid var(--border); display: inline-block; margin-bottom: 24px; box-shadow: var(--shadow);">
+            <div style="width: 200px; height: 200px; background: #111827; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white;">
+              <i data-lucide="qr-code" style="width: 120px; height: 120px; opacity: 0.9;"></i>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 12px;">
+            <button class="btn-primary" style="flex: 1;" onclick="showToast('Saving to gallery...')">Save Image</button>
+            <button class="btn-outline" style="width: auto; padding: 18px;" onclick="closeQRModal()">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Step 1: Welcome -->
+    <div id="step-1" class="screen" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+      <div class="onboarding-progress-container">
+        <div class="onboarding-progress-bar"><div id="fill-1" class="onboarding-progress-fill"></div></div>
+        <div class="onboarding-progress-bar"><div id="fill-2" class="onboarding-progress-fill"></div></div>
+        <div class="onboarding-progress-bar"><div id="fill-3" class="onboarding-progress-fill"></div></div>
+      </div>
+      <div style="position: absolute; top: 40px; right: 32px; z-index: 101;">
+        <button onclick="nextStep(3)" style="background: rgba(0,0,0,0.05); border: none; padding: 6px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; color: #6B7280; cursor: pointer;">Skip</button>
+      </div>
+      <h1>Support your favorite creators instantly</h1>
+      <p class="subtitle">The fastest way to show appreciation and get noticed by the creators you love.</p>
+      
+      <div class="main-card" id="card-welcome">
+        <div class="avatar-stack">
+          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Felix" class="stack-avatar">
+          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Jasper" class="stack-avatar">
+          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow" class="stack-avatar">
+          <div class="stack-count">+1.2k</div>
+        </div>
+        <div class="floating-pill">
+          <i data-lucide="heart" style="color: #EF4444; width: 18px; height: 18px; fill: #EF4444;"></i>
+          <span>New Tip: $25.00</span>
+        </div>
+      </div>
+
+      <div class="pagination-dots">
+        <div class="dot active"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+
+      <button class="btn-primary" onclick="nextStep(2)">
+        Next <i data-lucide="arrow-right" style="width: 20px; height: 20px;"></i>
+      </button>
+
+      <!-- Footer removed -->
+    </div>
+
+    <!-- Step 2: Interests -->
+    <div id="step-2" class="screen hidden" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+      <div class="onboarding-progress-container">
+        <div class="onboarding-progress-bar"><div class="onboarding-progress-fill finished"></div></div>
+        <div class="onboarding-progress-bar"><div id="fill-2" class="onboarding-progress-fill"></div></div>
+        <div class="onboarding-progress-bar"><div id="fill-3" class="onboarding-progress-fill"></div></div>
+      </div>
+      <div style="position: absolute; top: 40px; right: 32px; z-index: 101;">
+        <button onclick="nextStep(4)" style="background: rgba(0,0,0,0.05); border: none; padding: 6px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; color: #6B7280; cursor: pointer;">Skip</button>
+      </div>
+      <h1>What are you into?</h1>
+      <p class="subtitle">Select your interests to find creators you'll love to support.</p>
+      
+      <div class="interests-grid">
+        <button class="btn-outline" onclick="toggleInterest(this, 'Gaming')"><i data-lucide="gamepad-2"></i> Gaming</button>
+        <button class="btn-outline" onclick="toggleInterest(this, 'Art')"><i data-lucide="palette"></i> Art</button>
+        <button class="btn-outline" onclick="toggleInterest(this, 'Music')"><i data-lucide="music"></i> Music</button>
+        <button class="btn-outline" onclick="toggleInterest(this, 'Tech')"><i data-lucide="cpu"></i> Tech</button>
+        <button class="btn-outline" onclick="toggleInterest(this, 'Education')"><i data-lucide="graduation-cap"></i> Education</button>
+        <button class="btn-outline" onclick="toggleInterest(this, 'Lifestyle')"><i data-lucide="heart"></i> Lifestyle</button>
+      </div>
+
+      <div class="pagination-dots">
+        <div class="dot"></div>
+        <div class="dot active"></div>
+        <div class="dot"></div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn-secondary" onclick="nextStep(1)">Back <span class="icon-circle"><i data-lucide="help-circle" style="width: 12px; height: 12px;"></i></span></button>
+        <button class="btn-primary" onclick="nextStep(3)">Next <i data-lucide="arrow-right" style="width: 20px; height: 20px;"></i></button>
+      </div>
+
+      <!-- Footer removed -->
+    </div>
+
+    <!-- Step 3: Ready -->
+    <div id="step-3" class="screen hidden" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
+      <div class="onboarding-progress-container">
+        <div class="onboarding-progress-bar"><div class="onboarding-progress-fill finished"></div></div>
+        <div class="onboarding-progress-bar"><div class="onboarding-progress-fill finished"></div></div>
+        <div class="onboarding-progress-bar"><div id="fill-3" class="onboarding-progress-fill"></div></div>
+      </div>
+      <div style="position: absolute; top: 40px; right: 32px; z-index: 101;">
+        <button onclick="nextStep(4)" style="background: rgba(0,0,0,0.05); border: none; padding: 6px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; color: #6B7280; cursor: pointer;">Skip</button>
+      </div>
+      <h1>You're all set!</h1>
+      <p class="subtitle">Find your favorite creators and show them some love with a quick tip.</p>
+      
+      <div class="input-group" style="margin-bottom: 24px; background: white; border: 1.5px solid #F3F4F6; padding: 14px 20px; border-radius: 16px; display: flex; align-items: center; gap: 12px;">
+        <i data-lucide="search" style="width: 20px; height: 20px; color: #9CA3AF;"></i>
+        <input type="text" placeholder="Search creators, artists, gamers..." style="border: none; outline: none; flex: 1; font-size: 15px; font-family: inherit;" oninput="handleSearch(this.value)">
+      </div>
+      <div class="main-card" id="card-ready">
+        <div class="avatar-stack">
+          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Felix" class="stack-avatar">
+          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Jasper" class="stack-avatar">
+          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow" class="stack-avatar">
+          <div class="stack-count">+500</div>
+        </div>
+        <div class="floating-pill">
+          <i data-lucide="user-plus" style="width: 14px; height: 14px; color: var(--primary);"></i>
+          <span>New Creator: @sarah_art</span>
+        </div>
+      </div>
+
+      <div class="pagination-dots">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot active"></div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn-secondary" style="background: transparent; color: #F79F1A; border: none; box-shadow: none;" onclick="nextStep(2)">Back</button>
+        <button class="btn-primary" style="flex: 2;" onclick="nextStep(4)">Explore Creators <i data-lucide="search" style="width: 18px; height: 18px;"></i></button>
+      </div>
+
+      <!-- Footer removed -->
+    </div>
+
+    <!-- Step 4: Tipping Profile -->
+    <div id="step-4" class="screen hidden" style="padding-top: 60px;">
+      <div class="profile-header">
+        <img src="" alt="Alex Rivers" class="avatar-large" id="alex-avatar">
+        <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span class="alex-name">Alex Rivers</span> <i data-lucide="check-circle" style="width: 18px; height: 18px; fill: #1D9BF0; color: white;"></i></h2>
+        <p style="color: #6B7280; font-size: 14px;" class="alex-handle">@alex_creates</p>
+        <p style="color: #6B7280; font-size: 14px; margin-top: 12px; padding: 0 20px;">Thanks for supporting my work! Every tip helps me create more content for you.</p>
+        
+      </div>
+
+      <div class="tip-options">
+        <div class="tip-card" data-amount="1" onclick="selectTip(1)">
+          <div class="tip-amount">$1</div>
+          <div class="tip-label">Coffee</div>
+        </div>
+        <div class="tip-card active" data-amount="5" onclick="selectTip(5)">
+          <div class="tip-amount">$5</div>
+          <div class="tip-label">Snack</div>
+        </div>
+        <div class="tip-card" data-amount="10" onclick="selectTip(10)">
+          <div class="tip-amount">$10</div>
+          <div class="tip-label">Lunch</div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+        <div class="tip-card" style="flex: 1;" data-amount="25" onclick="selectTip(25)">
+          <div class="tip-amount">$25</div>
+          <div class="tip-label">Dinner</div>
+        </div>
+        <div style="flex: 1;">
+          <div style="font-size: 12px; font-weight: 600; margin-bottom: 4px;">Custom</div>
+          <div class="custom-tip">
+            <span>$</span>
+            <input type="number" placeholder="0.00" id="custom-amount" min="0" oninput="handleCustomAmount(this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Payment selection moved to next screen -->
+
+      <button class="btn-primary" onclick="nextStep(5)">
+        <i data-lucide="heart" style="width: 18px; height: 18px; fill: white;"></i> Send $<span id="tip-total">5.00</span> Tip
+      </button>
+
+      <div style="text-align: center; margin-top: 20px; font-size: 13px; color: #9CA3AF; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <i data-lucide="shield-check" style="width: 14px; height: 14px; color: #10B981;"></i>
+        Verified & Encrypted Checkout
+      </div>
+
+      <div class="top-supporters">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="font-size: 18px;">Top Supporters</h3>
+          <span style="font-size: 13px; color: #9CA3AF; font-weight: 500;">This Month</span>
+        </div>
+        <div class="supporter-item">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Felix" class="avatar-sm">
+            <div>
+              <div style="font-weight: 700; font-size: 14px;">John_Doe</div>
+              <div style="font-size: 11px; color: #9CA3AF;">#1 Supporter</div>
+            </div>
+          </div>
+          <div style="font-weight: 700; color: #111827;">$250.00</div>
+        </div>
+        <div class="supporter-item">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Jasper" class="avatar-sm">
+            <div>
+              <div style="font-weight: 700; font-size: 14px;">CryptoWhale</div>
+              <div style="font-size: 11px; color: #9CA3AF;">Just joined</div>
+            </div>
+          </div>
+          <div style="font-weight: 700; color: #111827;">$150.00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Detailed Payment -->
+    <div id="step-5" class="screen hidden" style="padding: 0;">
+      <div class="payment-header">
+        <button onclick="nextStep(4)" style="background: none; border: none; cursor: pointer; display: flex; align-items: center;"><i data-lucide="chevron-left" style="width: 24px; height: 24px;"></i></button>
+        <div>
+          <div style="font-size: 18px; font-weight: 700;">Choose Payment</div>
+          <div style="font-size: 12px; color: #6B7280;">Total: <span class="selected-total-amount">$25.00</span> USD</div>
+        </div>
+      </div>
+
+      <div style="padding: 24px;">
+        <div class="summary-card">
+          <img src="" alt="" class="summary-avatar" id="summary-avatar">
+          <div style="flex: 1;">
+            <div style="font-size: 12px; color: #6B7280; font-weight: 500;">Tipping <span class="alex-name">Alex Rivers</span></div>
+            <div style="font-size: 24px; font-weight: 700;" class="selected-total-amount">$25.00</div>
+          </div>
+        </div>
+
+        <div class="section-title">Message to Creator</div>
+        <div class="input-group" style="padding: 16px; background: #F9FAFB; border: 1.5px solid var(--border);">
+          <textarea id="tip-message" placeholder="Add a message of support..." style="width: 100%; border: none; background: transparent; outline: none; font-family: inherit; resize: none; height: 60px; font-size: 14px;"></textarea>
+        </div>
+
+        <div class="section-title">Cryptocurrency</div>
+        <div class="payment-methods">
+          <div class="method-card active" data-method="ton" onclick="selectMethod('ton')" style="height: auto; padding: 20px;">
+            <div style="display: flex; gap: 16px; align-items: center;">
+              <div style="width: 48px; height: 48px; background: white; border: 1px solid #F3F4F6; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 10px;">
+                <img src="https://cryptologos.cc/logos/toncoin-ton-logo.svg?v=032" style="width: 100%; height: 100%;">
+              </div>
+              <div>
+                <div style="font-weight: 700;">TON (Telegram)</div>
+                <div style="font-size: 12px; color: #6B7280;">Instant, zero-fee payment</div>
+              </div>
+            </div>
+            <div class="radio active"></div>
+          </div>
+          <div class="method-card" data-method="usdt" onclick="selectMethod('usdt')" style="height: auto; padding: 20px;">
+            <div style="display: flex; gap: 16px; align-items: center;">
+              <div style="width: 48px; height: 48px; background: white; border: 1px solid #F3F4F6; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 10px;">
+                <img src="https://cryptologos.cc/logos/tether-usdt-logo.svg?v=032" style="width: 100%; height: 100%;">
+              </div>
+              <div>
+                <div style="font-weight: 700;">USDT (TRC-20)</div>
+                <div style="font-size: 12px; color: #6B7280;">Low fees, fast settlement</div>
+              </div>
+            </div>
+            <div class="radio"></div>
+          </div>
+          <div class="method-card" data-method="trx" onclick="selectMethod('trx')" style="height: auto; padding: 20px;">
+            <div style="display: flex; gap: 16px; align-items: center;">
+              <div style="width: 48px; height: 48px; background: white; border: 1px solid #F3F4F6; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 10px;">
+                <img src="https://cryptologos.cc/logos/tron-trx-logo.svg?v=032" style="width: 100%; height: 100%;">
+              </div>
+              <div>
+                <div style="font-weight: 700;">TRON (TRX)</div>
+                <div style="font-size: 12px; color: #6B7280;">Native network payment</div>
+              </div>
+            </div>
+            <div class="radio"></div>
+          </div>
+          <div class="method-card" data-method="eth" onclick="selectMethod('eth')" style="height: auto; padding: 20px;">
+            <div style="display: flex; gap: 16px; align-items: center;">
+              <div style="width: 48px; height: 48px; background: white; border: 1px solid #F3F4F6; border-radius: 12px; display: flex; align-items: center; justify-content: center; padding: 10px;">
+                <img src="https://cryptologos.cc/logos/ethereum-eth-logo.svg?v=032" style="width: 100%; height: 100%;">
+              </div>
+              <div>
+                <div style="font-weight: 700;">Ethereum (ETH)</div>
+                <div style="font-size: 12px; color: #6B7280;">ERC-20 Network</div>
+              </div>
+            </div>
+            <div class="radio"></div>
+          </div>
+        </div>
+
+        <!-- Fiat & Cards removed -->
+
+        <div style="text-align: center; margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: #6B7280;">
+          <span>🔒</span> End-to-End Encrypted Tipping
+        </div>
+      </div>
+
+      <div style="position: sticky; bottom: 0; background: white; padding: 20px 24px; border-top: 1px solid var(--border); margin-top: auto;">
+        <button class="btn-primary" onclick="nextStep(6)">
+          Proceed to Checkout <span class="icon-circle" style="background: rgba(255,255,255,0.2); color: white;">?</span>
+        </button>
+        <div style="text-align: center; margin-top: 12px; font-size: 12px; color: #6B7280;">
+          By continuing, you agree to TipJar Terms
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6: Success Screen -->
+    <div id="step-6" class="screen hidden" style="background: #F9FAFB; padding-top: 60px;">
+      <div class="holographic-glow"></div>
+      
+      <div class="success-header">
+        <svg class="checkmark-svg" viewBox="0 0 52 52">
+          <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+          <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+        <h1 style="font-size: 32px; margin-bottom: 8px;">Success!</h1>
+        <p style="color: #6B7280; font-size: 15px;">Your support has been delivered.</p>
+      </div>
+
+      <div class="holographic-card">
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 32px;">
+          <img src="" alt="" class="avatar-sm" id="receipt-avatar" style="width: 54px; height: 54px; border: 2px solid white;">
+          <div>
+            <div style="font-size: 12px; color: #6B7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;">Supporting</div>
+            <div style="font-size: 18px; font-weight: 800;" class="alex-name">Alex Rivers</div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <span style="color: #6B7280; font-weight: 500;">Amount</span>
+          <span style="font-size: 24px; font-weight: 800; color: #111827;" class="selected-total-amount">$5.00</span>
+        </div>
+
+        <div class="receipt-divider"></div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div>
+            <div style="font-size: 10px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px;">Status</div>
+            <div id="receipt-status" style="color: #10B981; font-weight: 700; font-size: 13px;">PROCESSING...</div>
+          </div>
+          <div>
+            <div style="font-size: 10px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px;">Method</div>
+            <div id="receipt-method" style="color: #111827; font-weight: 700; font-size: 13px;">—</div>
+          </div>
+        </div>
+
+        <div id="receipt-message-container" style="display: none; margin-top: 24px; background: rgba(255,255,255,0.4); padding: 16px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.5);">
+          <div style="font-size: 10px; color: #6B7280; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Your Message</div>
+          <div id="receipt-message-text" style="font-size: 14px; font-weight: 500; color: #111827; font-style: italic;"></div>
+        </div>
+
+        <div style="margin-top: 24px;">
+          <div style="font-size: 10px; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;">Transaction ID</div>
+          <div id="receipt-tx-id" style="font-family: monospace; font-size: 11px; color: #6B7280; background: rgba(0,0,0,0.03); padding: 10px; border-radius: 12px; word-break: break-all;">
+            Generating...
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons" style="margin-top: auto;">
+        <button class="btn-primary" style="flex: 1;" onclick="nextStep(7)">
+          Done <i data-lucide="check" style="width: 20px; height: 20px;"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 7: Creator Dashboard -->
+    <div id="step-7" class="screen hidden" style="background: #FFFFFF;">
+    <!-- Ticker removed -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <img id="dashboard-avatar" src="https://api.dicebear.com/7.x/adventurer/svg?seed=Alex" alt="" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; box-shadow: var(--shadow);">
+          <div>
+            <div style="font-weight: 800; font-size: 18px;" class="alex-name">Creator</div>
+            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #10B981; font-weight: 700;">
+              <span style="width: 6px; height: 6px; background: #10B981; border-radius: 50%;"></span> LIVE
+            </div>
+          </div>
+        </div>
+        <button class="btn-filter" style="padding: 8px 12px; font-size: 12px;" onclick="nextStep(9)">
+          <i data-lucide="settings" style="width: 14px; height: 14px;"></i> Settings
+        </button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Today</div>
+          <div class="stat-value" id="stat-today">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">This Week</div>
+          <div class="stat-value" id="stat-week">$0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">All Time</div>
+          <div class="stat-value" id="stat-alltime">$0</div>
+        </div>
+      </div>
+
+      <div class="withdraw-card-orange">
+        <div>
+          <div class="withdraw-info-label">Available to Withdraw</div>
+          <div class="withdraw-info-value current-balance">$2,450.12</div>
+        </div>
+        <button class="withdraw-btn-dark" onclick="openWithdrawModal()">Withdraw</button>
+      </div>
+
+      <div class="quick-actions">
+        <div class="action-btn" onclick="nextStep(8)">
+          <div class="action-icon"><i data-lucide="users"></i></div>
+          <span style="font-size: 10px; font-weight: 700;">Supporters</span>
+        </div>
+        <div class="action-btn" onclick="openQRModal()">
+          <div class="action-icon"><i data-lucide="qr-code"></i></div>
+          <span style="font-size: 10px; font-weight: 700;">QR</span>
+        </div>
+        <div class="action-btn" onclick="nextStep(10)">
+          <div class="action-icon"><i data-lucide="bell"></i></div>
+          <span style="font-size: 10px; font-weight: 700;">Alerts</span>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-header">
+            <span style="font-size: 11px; color: #6B7280; font-weight: 600;">Monthly Tips</span>
+            <span class="growth-badge growth-up">+12%</span>
+          </div>
+          <div style="font-size: 20px; font-weight: 800;">$3,120</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-header">
+            <span style="font-size: 11px; color: #6B7280; font-weight: 600;">Supporters</span>
+            <span class="growth-badge growth-up">+8%</span>
+          </div>
+          <div style="font-size: 20px; font-weight: 800;">842</div>
+        </div>
+      </div>
+
+      <div class="goal-container" style="background: white; border-radius: 24px; padding: 24px; border: 1px solid var(--border); margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+          <div>
+            <div style="font-size: 11px; color: var(--primary); font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px;">Active Goal</div>
+            <h3 style="font-size: 18px; font-weight: 800; color: #111827;">New Studio Camera 🎥</h3>
+          </div>
+          <button style="background: #F9FAFB; border: 1px solid var(--border); width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s;">
+            <i data-lucide="edit-2" style="width: 16px; height: 16px; color: #6B7280;"></i>
+          </button>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px;">
+          <div style="font-size: 28px; font-weight: 800; color: #111827;">$2,450<span style="font-size: 15px; color: #9CA3AF; font-weight: 600;"> / $3,000</span></div>
+          <div style="font-size: 16px; font-weight: 800; color: var(--primary);">81%</div>
+        </div>
+
+        <div style="width: 100%; height: 16px; background: #F3F4F6; border-radius: 100px; overflow: hidden; position: relative;">
+          <div id="goal-progress-bar" style="position: absolute; top: 0; left: 0; height: 100%; width: 0%; background: linear-gradient(90deg, #F79F1A, #F59E0B); border-radius: 100px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: inset 0 -2px 4px rgba(0,0,0,0.1);"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 32px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <h3 style="font-size: 16px; font-weight: 800;">Recent Activity</h3>
+          <button style="background: none; border: none; color: var(--primary); font-size: 12px; font-weight: 700; cursor: pointer;" onclick="nextStep(8)">View All</button>
+        </div>
+        
+        <div class="supporter-item" style="border: none; background: white; padding: 16px; border-radius: 20px; border: 1px solid #F3F4F6; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Alex" class="avatar-sm">
+            <div>
+              <div style="font-weight: 700; font-size: 14px;">@alex_smith</div>
+              <div style="font-size: 11px; color: #9CA3AF;">2 hours ago • USDT</div>
+            </div>
+          </div>
+          <div style="color: #10B981; font-weight: 700;">+$50.00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 8: Top Supporters Detailed -->
+    <div id="step-8" class="screen hidden" style="padding: 0;">
+      <div class="payment-header">
+        <button onclick="nextStep(7)" style="background: none; border: none; cursor: pointer; display: flex; align-items: center;"><i data-lucide="chevron-left" style="width: 24px; height: 24px;"></i></button>
+        <div style="flex: 1; text-align: center;">
+          <div style="font-size: 18px; font-weight: 700;">Top Supporters</div>
+        </div>
+        <button style="background: none; border: none; color: #6B7280; display: flex; align-items: center;"><i data-lucide="info" style="width: 20px; height: 20px;"></i></button>
+      </div>
+
+      <div style="padding: 24px;">
+        <div style="display: flex; justify-content: center; margin-bottom: 24px; position: relative;">
+          <button id="leaderboard-filter-btn" class="btn-filter" onclick="toggleDropdown()">
+            <i data-lucide="calendar" style="width: 16px; height: 16px;"></i> <span id="current-filter">October 2023</span> <i data-lucide="chevron-down" style="width: 16px; height: 16px;"></i>
+          </button>
+          <div id="leaderboard-dropdown" class="dropdown-menu">
+            <div class="dropdown-item" onclick="selectFilter('October 2023')">October 2023</div>
+            <div class="dropdown-item" onclick="selectFilter('September 2023')">September 2023</div>
+            <div class="dropdown-item" onclick="selectFilter('August 2023')">August 2023</div>
+            <div class="divider-dashed" style="margin: 8px 0;"></div>
+            <div class="dropdown-item" style="color: #F79F1A;" onclick="selectFilter('All Time')">All Time</div>
+          </div>
+        </div>
+
+        <div class="podium-container">
+          <div class="podium-item">
+            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Felix" class="podium-avatar" style="border-color: #E5E7EB;">
+            <div class="podium-card">
+              <div style="font-size: 11px; color: #6B7280;">2nd</div>
+              <div style="font-size: 16px; font-weight: 700;">$450</div>
+            </div>
+          </div>
+          <div class="podium-item first">
+            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Jasper" class="podium-avatar">
+            <div class="podium-card">
+              <div style="font-size: 11px; color: #6B7280;">1st</div>
+              <div style="font-size: 18px; font-weight: 700;">$1,200</div>
+            </div>
+          </div>
+          <div class="podium-item">
+            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow" class="podium-avatar" style="border-color: #E5E7EB;">
+            <div class="podium-card">
+              <div style="font-size: 11px; color: #6B7280;">3rd</div>
+              <div style="font-size: 16px; font-weight: 700;">$280</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align: center; color: #9CA3AF; font-size: 12px; margin-bottom: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;">All Tippers</div>
+
+        <div class="payment-methods">
+          <div class="method-card" style="padding: 18px; border-radius: 20px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #FFFBEB; color: #F79F1A; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">1</div>
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" class="avatar-sm">
+              <div>
+                <div style="font-weight: 700;">Satoshi_G</div>
+                <div style="font-size: 11px; color: #9CA3AF;">2 mins ago • USDT</div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-weight: 700; color: #10B981; font-size: 16px;">$1,200</div>
+            </div>
+          </div>
+
+          <div class="method-card" style="padding: 18px; border-radius: 20px;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <div style="width: 28px; height: 28px; border-radius: 50%; background: #F3F4F6; color: #9CA3AF; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">2</div>
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jasper" class="avatar-sm">
+              <div>
+                <div style="font-weight: 700;">Jane_Doe</div>
+                <div style="font-size: 11px; color: #9CA3AF;">1 hour ago • ETH</div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-weight: 700; color: #10B981; font-size: 16px;">$450</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="position: sticky; bottom: 0; background: white; padding: 20px 24px; border-top: 1px solid var(--border); margin-top: auto;">
+        <button class="btn-primary" onclick="nextStep(4)">
+          <span style="font-size: 14px;">❤</span> Send a Tip
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 9: Share & Settings -->
+    <div id="step-9" class="screen hidden">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+        <div>
+          <h1 style="margin-bottom: 4px;">Share & Settings</h1>
+          <p style="color: #6B7280; font-size: 14px;">Grow your tips and customize experience</p>
+        </div>
+        <button onclick="nextStep(7)" style="width: 40px; height: 40px; border-radius: 50%; background: #F3F4F6; border: none; font-size: 20px; cursor: pointer;">✕</button>
+      </div>
+
+      <div class="settings-section">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: #FFF7ED; color: #F79F1A; display: flex; align-items: center; justify-content: center;"><i data-lucide="link" style="width: 20px; height: 20px;"></i></div>
+          <div>
+            <div style="font-weight: 700;">Your TipJar Link</div>
+            <div style="font-size: 12px; color: #6B7280;">Share this link in your bio or channel</div>
+          </div>
+        </div>
+        <div class="input-group">
+          <input type="text" id="tipjar-link" value="t.me/TipJarBot?start=creator_99" readonly>
+          <button style="background: none; border: none; cursor: pointer;" onclick="copyToClipboard('t.me/TipJarBot?start=creator_99')"><i data-lucide="copy" style="width: 18px; height: 18px; color: #6B7280;"></i></button>
+        </div>
+        <div class="settings-btn-row">
+          <button class="btn-primary" style="padding: 14px; font-size: 16px; box-shadow: none;" onclick="copyToClipboard('t.me/TipJarBot?start=creator_99')">Share Link</button>
+          <button class="btn-icon" onclick="openQRModal()"><i data-lucide="qr-code" style="width: 18px; height: 18px;"></i> QR</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: #FFF7ED; color: #F79F1A; display: flex; align-items: center; justify-content: center;"><i data-lucide="message-square-heart" style="width: 20px; height: 20px;"></i></div>
+          <div>
+            <div style="font-weight: 700;">Thank You Message</div>
+            <div style="font-size: 12px; color: #6B7280;">Sent automatically after every tip</div>
+          </div>
+        </div>
+        <div class="input-group" style="padding: 16px;">
+          <textarea style="width: 100%; border: none; background: transparent; outline: none; font-family: inherit; resize: none; height: 60px;">Thanks for the support! It means the world to me. Keep being awesome!</textarea>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+          <span style="font-size: 12px; color: #6B7280;">Max 120 characters</span>
+          <button class="btn-primary" style="width: auto; padding: 12px 24px; font-size: 14px; background: #1F2937; box-shadow: none;" onclick="saveThankYouMessage()">Save Message</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: #FFF7ED; color: #F79F1A; display: flex; align-items: center; justify-content: center;"><i data-lucide="wallet" style="width: 20px; height: 20px;"></i></div>
+          <div>
+            <div style="font-weight: 700;">Payout Wallet</div>
+            <div style="font-size: 12px; color: #6B7280;">Where your earnings are sent on withdrawal</div>
+          </div>
+        </div>
+        <div style="margin-top: 16px;">
+          <div id="wallet-not-set" style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 16px; padding: 16px; display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <i data-lucide="alert-circle" style="width: 20px; height: 20px; color: #EF4444; flex-shrink: 0;"></i>
+            <div style="font-size: 13px; color: #991B1B; font-weight: 600;">No payout wallet set — you cannot withdraw until you add one.</div>
+          </div>
+          <div class="input-group" style="flex-direction: column; align-items: stretch; gap: 8px;">
+            <label style="font-size: 12px; font-weight: 700; color: #4B5563;">TON / USDT / ETH / TRX Wallet Address</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="payout-wallet-input" placeholder="Enter your wallet address..." style="flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--border); font-size: 13px; outline: none; font-family: monospace;">
+              <button class="btn-primary" style="width: auto; padding: 12px 16px; box-shadow: none; flex-shrink: 0;" onclick="savePayoutWallet()">Save</button>
+            </div>
+          </div>
+          <div id="wallet-saved-display" style="display: none; margin-top: 12px; background: #ECFDF5; border: 1px solid #6EE7B7; border-radius: 16px; padding: 14px; display: none;">
+            <div style="font-size: 11px; color: #059669; font-weight: 700; margin-bottom: 4px;">✓ PAYOUT WALLET SET</div>
+            <div id="wallet-address-display" style="font-family: monospace; font-size: 12px; color: #065F46; word-break: break-all;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 10: Alerts/Notifications -->
+    <div id="step-10" class="screen hidden" style="background: #FFFFFF;">
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 32px;">
+        <button class="btn-filter" style="width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 50%;" onclick="nextStep(7)">
+          <i data-lucide="chevron-left" style="width: 20px; height: 20px;"></i>
+        </button>
+        <h1 style="margin-bottom: 0;">Notifications</h1>
+      </div>
+
+      <div id="notifications-list">
+        <!-- Loaded by JS -->
+      </div>
+    </div>
+
+    <!-- Step 11: Treasure Arcade (Hub) -->
+    <div id="step-11" class="screen hidden" style="background: #FFFBF0; padding: 0;">
+      <div class="arcade-header">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 24px 24px 10px;">
+          <button onclick="nextStep(7)" style="background: none; border: none; cursor: pointer;"><i data-lucide="chevron-left" style="width: 24px; height: 24px; color: #92400E;"></i></button>
+          <div class="ticket-badge">
+            <i data-lucide="ticket" style="width: 14px; height: 14px;"></i>
+            <span id="ticket-count">5</span> Tickets
+          </div>
+        </div>
+        <div style="padding: 0 24px 24px;">
+          <h1 style="color: #92400E; margin-bottom: 4px; font-size: 28px;">Treasure Arcade</h1>
+          <p style="color: #B45309; font-size: 14px; font-weight: 600;">Play to win USDT rewards! ✨</p>
+        </div>
+      </div>
+
+      <div style="padding: 24px; display: grid; gap: 20px;">
+        <!-- Fortune Wheel Card -->
+        <div class="arcade-card-premium" onclick="startFortuneWheel()">
+          <div class="arcade-card-content">
+            <div class="arcade-badge">POPULAR</div>
+            <div style="display: flex; gap: 20px; align-items: center;">
+              <div class="arcade-icon-wrapper wheel-bg">
+                <i data-lucide="rotate-cw" style="width: 32px; height: 32px;"></i>
+              </div>
+              <div>
+                <h3 style="font-size: 18px; font-weight: 800; color: #111827;">Fortune Wheel</h3>
+                <p style="font-size: 12px; color: #6B7280;">Spin to win up to $100.00</p>
+              </div>
+            </div>
+          </div>
+          <div class="arcade-footer">
+            <span style="font-weight: 700; color: #F79F1A;">Cost: 1 Ticket</span>
+            <button class="btn-play">Play Now</button>
+          </div>
+        </div>
+
+        <!-- Scratch Card -->
+        <div class="arcade-card-premium" onclick="startScratchCard()">
+          <div class="arcade-card-content">
+            <div style="display: flex; gap: 20px; align-items: center;">
+              <div class="arcade-icon-wrapper scratch-bg">
+                <i data-lucide="sparkles" style="width: 32px; height: 32px;"></i>
+              </div>
+              <div>
+                <h3 style="font-size: 18px; font-weight: 800; color: #111827;">Scratch & Win</h3>
+                <p style="font-size: 12px; color: #6B7280;">Instant rewards underneath</p>
+              </div>
+            </div>
+          </div>
+          <div class="arcade-footer">
+            <span style="font-weight: 700; color: #F79F1A;">Cost: 1 Ticket</span>
+            <button class="btn-play">Play Now</button>
+          </div>
+        </div>
+
+        <!-- Mystery Box (Coming Soon) -->
+        <div class="arcade-card-premium locked">
+          <div class="arcade-card-content">
+            <div style="display: flex; gap: 20px; align-items: center;">
+              <div class="arcade-icon-wrapper locked-bg">
+                <i data-lucide="lock" style="width: 32px; height: 32px;"></i>
+              </div>
+              <div>
+                <h3 style="font-size: 18px; font-weight: 800; color: #9CA3AF;">Mystery Box</h3>
+                <p style="font-size: 12px; color: #9CA3AF;">Level 5 required</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 12: Game Container (Phaser) -->
+    <div id="step-12" class="screen hidden" style="padding: 0; background: #000; overflow: hidden;">
+      <div id="phaser-game-container" style="width: 100%; height: 100%;"></div>
+      
+      <!-- Overlay UI for games -->
+      <div id="game-ui-overlay" class="hidden" style="position: absolute; bottom: 40px; left: 0; width: 100%; padding: 0 32px; z-index: 100;">
+        <div class="reward-toast" id="reward-toast">
+          <div style="font-size: 12px; font-weight: 700; opacity: 0.8;">CONGRATS!</div>
+          <div style="font-size: 24px; font-weight: 800; margin: 4px 0;" id="game-reward-amount">$45.00</div>
+          <button class="btn-primary" onclick="claimReward()" style="padding: 16px;">Claim to Balance</button>
+        </div>
+      </div>
+
+      <button onclick="nextStep(11)" style="position: absolute; top: 24px; left: 24px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; color: white; cursor: pointer; backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 101;">
+        <i data-lucide="x" style="width: 24px; height: 24px;"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <!-- Goal Modal -->
+  <div id="goal-modal" class="modal-overlay" onclick="closeModal(event, 'goal-modal')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Edit Active Goal</h3>
+      <p style="color: #6B7280; font-size: 14px; margin-bottom: 24px;">Update what you're raising funds for.</p>
+      <div class="input-group" style="margin-bottom: 16px;">
+        <label style="font-size: 12px; font-weight: 700; color: #4B5563; margin-bottom: 8px; display: block;">Goal Title</label>
+        <input type="text" id="goal-title-input" value="New Studio Camera 🎥" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); font-family: inherit; font-size: 14px; outline: none;">
+      </div>
+      <div class="input-group" style="margin-bottom: 24px;">
+        <label style="font-size: 12px; font-weight: 700; color: #4B5563; margin-bottom: 8px; display: block;">Target Amount ($)</label>
+        <input type="number" id="goal-target-input" value="3000" min="1" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); font-family: inherit; font-size: 14px; outline: none;">
+      </div>
+      <button class="btn-primary" style="width: 100%; margin-bottom: 12px;" onclick="saveGoal()">Save Goal</button>
+      <button style="width: 100%; background: none; border: none; color: #6B7280; font-weight: 700; font-size: 15px; cursor: pointer;" onclick="closeModal(null, 'goal-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- QR Modal -->
+  <div id="qr-modal" class="modal-overlay" onclick="closeModal(event, 'qr-modal')">
+    <div class="modal-content" onclick="event.stopPropagation()" style="text-align: center;">
+      <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Share Profile</h3>
+      <p style="color: #6B7280; font-size: 14px; margin-bottom: 24px;">Let your supporters scan or click to tip.</p>
+      <div style="background: #F9FAFB; border: 1px solid var(--border); padding: 24px; border-radius: 20px; display: inline-block; margin-bottom: 24px;">
+        <i data-lucide="qr-code" style="width: 120px; height: 120px; color: #111827;"></i>
+      </div>
+      <button class="btn-primary" style="width: 100%; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;" onclick="copyToClipboard('https://tipjar.app/alex_creates')">
+        <i data-lucide="copy" style="width: 18px; height: 18px;"></i> Copy Profile Link
+      </button>
+      <button style="width: 100%; background: none; border: none; color: #6B7280; font-weight: 700; font-size: 15px; cursor: pointer;" onclick="closeModal(null, 'qr-modal')">Close</button>
+    </div>
+  </div>
+
+  <!-- Withdraw Modal -->
+  <div id="withdraw-modal" class="modal-overlay" onclick="closeModal(event, 'withdraw-modal')">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <h3 style="font-size: 20px; font-weight: 800; margin-bottom: 8px;">Withdraw Funds</h3>
+      <p style="color: #6B7280; font-size: 14px; margin-bottom: 24px;">Transfer your available balance to your TON wallet.</p>
+      <div style="background: #F9FAFB; padding: 16px; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 24px; text-align: center;">
+        <div style="font-size: 12px; color: #6B7280; font-weight: 700; margin-bottom: 4px;">Available Balance</div>
+        <div style="font-size: 28px; font-weight: 800; color: #111827;" class="current-balance">$2,450.12</div>
+      </div>
+      <button class="btn-primary" style="width: 100%; margin-bottom: 12px; background: #111827; color: white;" onclick="confirmWithdraw()">Confirm Withdrawal</button>
+      <button style="width: 100%; background: none; border: none; color: #6B7280; font-weight: 700; font-size: 15px; cursor: pointer;" onclick="closeModal(null, 'withdraw-modal')">Cancel</button>
+    </div>
+  </div>
+
+  <!-- First-Tip Celebration Overlay -->
+  <div id="first-tip-overlay" style="display: none; position: fixed; inset: 0; z-index: 2000; background: linear-gradient(135deg, #111827 0%, #1a0533 100%); flex-direction: column; align-items: center; justify-content: center; padding: 40px; text-align: center;">
+    <div id="first-tip-confetti" style="position: absolute; inset: 0; pointer-events: none; overflow: hidden;"></div>
+    <div style="position: relative; z-index: 1;">
+      <div style="font-size: 72px; margin-bottom: 16px; animation: bounceIn 0.6s ease-out;">🎉</div>
+      <div style="font-size: 13px; color: var(--primary); font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">First Tip Received!</div>
+      <h1 style="font-size: 36px; font-weight: 800; color: white; margin-bottom: 8px;" id="first-tip-amount">+$0.00</h1>
+      <p style="color: rgba(255,255,255,0.7); font-size: 16px; margin-bottom: 8px;" id="first-tip-from">Your journey begins now</p>
+      <p style="color: rgba(255,255,255,0.4); font-size: 13px; margin-bottom: 48px;">Share your TipJar link to receive even more support 🚀</p>
+      <button class="btn-primary" style="font-size: 16px; padding: 18px 32px; border-radius: 100px;" onclick="dismissFirstTip()">
+        Open My Dashboard 📊
+      </button>
+      <div style="margin-top: 20px;">
+        <button style="background: none; border: none; color: rgba(255,255,255,0.4); font-size: 14px; cursor: pointer;" onclick="shareProfileLink()">
+          Share my TipJar link →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
