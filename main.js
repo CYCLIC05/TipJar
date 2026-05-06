@@ -101,6 +101,12 @@ const App = {
       const MERCHANT_ADDRESS = 'UQDwT-v0d7vO-u6nO7wA99N61v0p5wzP-5p8V4O0x_1W6fHj';
       showLoadingOverlay(true, 'Waiting for wallet signature...');
       
+      if (sendTxBtn) {
+        sendTxBtn.innerHTML = 'Processing... <div class="spinner-custom" style="width: 18px; height: 18px; border-width: 2px;"></div>';
+        sendTxBtn.style.opacity = '0.7';
+        sendTxBtn.style.pointerEvents = 'none';
+      }
+
       const transaction = {
         validUntil: Math.floor(Date.now() / 1000) + 300,
         messages: [
@@ -144,7 +150,23 @@ const App = {
     } catch (err) {
       showLoadingOverlay(false);
       console.error('[TipJar] ❌ Payment Error:', err);
+      
       if (statusEl) { statusEl.innerText = 'PAYMENT FAILED'; statusEl.style.color = '#EF4444'; }
+      
+      // Restore button for retry
+      if (sendTxBtn) {
+        sendTxBtn.innerHTML = 'Retry Payment <i data-lucide="refresh-cw" style="width: 18px; height: 18px; margin-left: 8px;"></i>';
+        sendTxBtn.style.opacity = '1';
+        sendTxBtn.style.pointerEvents = 'auto';
+        if (window.lucide) window.lucide.createIcons();
+      }
+
+      // Update header to guide user
+      const headerTitle = document.querySelector('#awaiting-header h1');
+      const headerText = document.querySelector('#awaiting-header p');
+      if (headerTitle) headerTitle.innerText = 'Payment Canceled';
+      if (headerText) headerText.innerText = 'The transaction was rejected. You can try again below.';
+
       showToast('Payment rejected or timed out.');
     }
   },

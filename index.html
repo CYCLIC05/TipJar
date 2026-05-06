@@ -288,16 +288,21 @@
 
       <div class="nav-buttons" style="margin-top: auto; display: flex; gap: 12px; flex-direction: column;">
         
+        <button id="send-tx-btn" class="btn-primary" style="width: 100%; display: none; align-items: center; justify-content: center; gap: 12px; height: 64px; font-size: 18px; background: #0088CC; box-shadow: 0 10px 30px rgba(0, 136, 204, 0.3);" onclick="App.handleTonPayment()">
+          Confirm Payment <i data-lucide="check" style="width: 20px; height: 20px;"></i>
+        </button>
+
         <div id="ton-connect-wrapper" style="display: flex; justify-content: center; width: 100%; margin-bottom: 8px;">
           <!-- TON Connect UI injects button here -->
           <div id="ton-connect-button"></div>
         </div>
 
-        <button id="send-tx-btn" class="btn-primary" style="width: 100%; display: none; background: #0088CC; color: white;">
-          Confirm Payment <i data-lucide="check" style="width: 18px; height: 18px; margin-left: 6px;"></i>
-        </button>
         <button id="receipt-done-btn" class="btn-primary" style="width: 100%; display: none;" onclick="nextStep(7)">
           Done <i data-lucide="check" style="width: 20px; height: 20px;"></i>
+        </button>
+
+        <button id="receipt-back-btn" class="btn-secondary" style="width: 100%; border: none; background: transparent; color: #6B7280; font-weight: 700; cursor: pointer; padding: 12px;" onclick="nextStep(5)">
+          <i data-lucide="arrow-left" style="width: 16px; height: 16px; margin-right: 4px; vertical-align: middle;"></i> Back to Selection
         </button>
       </div>
     </div>
