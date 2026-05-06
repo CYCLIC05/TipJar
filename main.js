@@ -304,10 +304,7 @@ window.nextStep = async (step) => {
     const methodEl = document.getElementById('receipt-method');
     const txEl = document.getElementById('receipt-tx-id');
 
-    if (methodEl) methodEl.innerText = 'TON Wallet';
-    if (txEl) txEl.innerText = 'Self-Custody Transfer';
-    if (statusEl) { statusEl.innerText = 'CONNECT WALLET'; statusEl.style.color = '#F79F1A'; }
-    
+    // Capture Message
     const msgInput = document.getElementById('tip-message');
     if (msgInput) state.selectedMessage = msgInput.value;
 
@@ -320,29 +317,22 @@ window.nextStep = async (step) => {
       receiptMsgContainer.style.display = 'none';
     }
 
-    transitionScreen(currentScreen, nextScreen);
-    state.currentStep = step;
-
+    // Initial Defaults
+    if (methodEl) methodEl.innerText = 'TON Wallet';
+    if (txEl) txEl.innerText = 'Self-Custody Transfer';
     if (doneBtn) doneBtn.style.display = 'none';
-    if (connectWrapper) connectWrapper.style.display = 'flex';
 
-    // Load premium animations
-    if (step === 1) {
-      App.playLottie('lottie-container-welcome', '/coin-jar.json');
-      if (fill) fill.classList.add('active');
-    }
-
-    if (step === 3) {
-      App.playLottie('lottie-container-ready', '/coin-jar.json');
-    }
-
-    if (step === 6) {
+    // Connection Check & UI Toggle
+    const isConnected = tonConnectUI && tonConnectUI.connected;
+    
+    if (isConnected) {
       if (sendTxBtn) {
         sendTxBtn.style.display = 'flex';
         sendTxBtn.classList.add('pulse-ready');
+        sendTxBtn.onclick = () => App.handleTonPayment();
       }
       if (statusEl) { statusEl.innerText = 'READY TO SIGN'; statusEl.style.color = '#3B82F6'; }
-      if (connectWrapper) connectWrapper.style.display = 'none'; // Hide the giant pill
+      if (connectWrapper) connectWrapper.style.display = 'none';
       
       // Update method with address
       if (methodEl) {
@@ -356,30 +346,30 @@ window.nextStep = async (step) => {
         `;
       }
 
-      // Update header for connected state
       const headerTitle = document.querySelector('#awaiting-header h1');
       const headerText = document.querySelector('#awaiting-header p');
       if (headerTitle) headerTitle.innerText = 'Confirm Payment';
       if (headerText) headerText.innerText = 'Wallet linked! Tap confirm to sign the transaction.';
+
+      // AUTO-TRIGGER
+      console.log('[TipJar] ⚡ Already connected. Auto-triggering...');
+      setTimeout(() => App.handleTonPayment(), 500);
     } else {
       if (sendTxBtn) {
         sendTxBtn.style.display = 'none';
         sendTxBtn.classList.remove('pulse-ready');
       }
-      if (connectWrapper) connectWrapper.style.display = 'flex'; // Show pill if not connected
-      if (methodEl) methodEl.innerText = 'TON Wallet';
+      if (connectWrapper) connectWrapper.style.display = 'flex';
+      if (statusEl) { statusEl.innerText = 'LINK WALLET'; statusEl.style.color = '#F79F1A'; }
 
-      // Revert header if disconnected
       const headerTitle = document.querySelector('#awaiting-header h1');
       const headerText = document.querySelector('#awaiting-header p');
       if (headerTitle) headerTitle.innerText = 'Connect Wallet';
       if (headerText) headerText.innerText = 'Connect your TON wallet to sign the transaction.';
     }
 
-    // Handle manual click if auto-trigger fails
-    if (sendTxBtn) {
-      sendTxBtn.onclick = () => App.handleTonPayment();
-    }
+    transitionScreen(currentScreen, nextScreen);
+    state.currentStep = step;
     return;
   }
 
@@ -392,6 +382,8 @@ window.nextStep = async (step) => {
     
     // Auto-advance logic for onboarding (Steps 1, 2, 3)
     if (step < 4) {
+      if (step === 1) App.playLottie('lottie-container-welcome', '/coin-jar.json');
+      if (step === 3) App.playLottie('lottie-container-ready', '/coin-jar.json');
       startOnboardingTimer(step);
     }
 
