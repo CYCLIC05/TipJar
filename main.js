@@ -69,24 +69,90 @@ const App = {
         twaReturnUrl: 'https://t.me/TipJarBot'
       };
 
-      tonConnectUI.onStatusChange(wallet => {
+      tonConnectUI.onStatusChange(async (wallet) => {
         if (wallet) {
           state.tonAddress = wallet.account.address;
-          const statusEl = document.getElementById('receipt-status');
-          const sendTxBtn = document.getElementById('send-tx-btn');
-          if (statusEl) { statusEl.innerText = 'READY TO SIGN'; statusEl.style.color = '#3B82F6'; }
-          if (sendTxBtn) sendTxBtn.style.display = 'flex';
-          
           console.log('[TipJar] 👛 Wallet Connected:', state.tonAddress);
+          
+          // AUTO-PAYMENT LOGIC:
+          // If the user is on the payment screen (Step 6), trigger the transaction immediately
+          if (state.currentStep === 6) {
+            console.log('[TipJar] ⚡ Auto-triggering transaction signature...');
+            App.handleTonPayment();
+          }
         } else {
           state.tonAddress = null;
-          const sendTxBtn = document.getElementById('send-tx-btn');
-          if (sendTxBtn) sendTxBtn.style.display = 'none';
           console.log('[TipJar] 👛 Wallet Disconnected');
         }
       });
     } catch (err) {
       console.warn('[TipJar] TonConnect Initialization Error:', err);
+    }
+  },
+
+  // Centralized Payment Logic
+  async handleTonPayment() {
+    const statusEl = document.getElementById('receipt-status');
+    const sendTxBtn = document.getElementById('send-tx-btn');
+    const doneBtn = document.getElementById('receipt-done-btn');
+    const connectWrapper = document.getElementById('ton-connect-wrapper');
+
+    try {
+      const MERCHANT_ADDRESS = 'UQDwT-v0d7vO-u6nO7wA99N61v0p5wzP-5p8V4O0x_1W6fHj';
+      showLoadingOverlay(true, 'Waiting for wallet signature...');
+      
+      const transaction = {
+        validUntil: Math.floor(Date.now() / 1000) + 300,
+        messages: [
+          {
+            address: MERCHANT_ADDRESS,
+            amount: "50000000", // 0.05 TON
+          }
+        ]
+      };
+
+      const result = await tonConnectUI.sendTransaction(transaction);
+      console.log('[TipJar] ✅ TON Payment Success:', result);
+      
+      showLoadingOverlay(false);
+      
+      // Update Success Screen Info
+      const successAmountEl = document.getElementById('success-amount');
+      const successCreatorEl = document.getElementById('success-creator-name');
+      if (successAmountEl) successAmountEl.innerText = state.selectedAmount.toFixed(2);
+      if (successCreatorEl) successCreatorEl.innerText = state.creator.name;
+
+      // Show Confetti and Go to Success Screen
+      showConfetti();
+      nextStep(13);
+      App.playLottie('lottie-container-success', '/coin-jar.json'); 
+      
+      state.balance += state.selectedAmount;
+      updateDynamicUI();
+
+      // Record in DB for the target creator
+      const targetId = state.selectedCreatorId || (dbCreator ? dbCreator.id : null);
+      if (targetId) {
+        await createTipRecord({
+          creatorId: targetId,
+          tipperName: state.tipperName || 'Supporter',
+          amountUsd: state.selectedAmount,
+          currency: 'TON',
+          txId: result.boc || 'TON_TRANSFER'
+        });
+      }
+    } catch (err) {
+      showLoadingOverlay(false);
+      console.error('[TipJar] ❌ Payment Error:', err);
+      if (statusEl) { statusEl.innerText = 'PAYMENT FAILED'; statusEl.style.color = '#EF4444'; }
+      showToast('Payment rejected or timed out.');
+    }
+  },
+
+  async disconnectWallet() {
+    if (tonConnectUI) {
+      await tonConnectUI.disconnect();
+      nextStep(6); // Refresh step 6 UI
     }
   },
 
@@ -171,7 +237,20 @@ window.nextStep = async (step) => {
         sendTxBtn.classList.add('pulse-ready');
       }
       if (statusEl) { statusEl.innerText = 'READY TO SIGN'; statusEl.style.color = '#3B82F6'; }
+      if (connectWrapper) connectWrapper.style.display = 'none'; // Hide the giant pill
       
+      // Update method with address
+      if (methodEl) {
+        const addr = state.tonAddress;
+        const truncated = addr ? `${addr.slice(0, 4)}...${addr.slice(-4)}` : 'Connected';
+        methodEl.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>${truncated}</span>
+            <button onclick="App.disconnectWallet()" style="background: #F3F4F6; border: none; padding: 4px 8px; border-radius: 8px; font-size: 10px; font-weight: 700; color: #6B7280; cursor: pointer;">Change</button>
+          </div>
+        `;
+      }
+
       // Update header for connected state
       const headerTitle = document.querySelector('#awaiting-header h1');
       const headerText = document.querySelector('#awaiting-header p');
@@ -182,7 +261,9 @@ window.nextStep = async (step) => {
         sendTxBtn.style.display = 'none';
         sendTxBtn.classList.remove('pulse-ready');
       }
-      
+      if (connectWrapper) connectWrapper.style.display = 'flex'; // Show pill if not connected
+      if (methodEl) methodEl.innerText = 'TON Wallet';
+
       // Revert header if disconnected
       const headerTitle = document.querySelector('#awaiting-header h1');
       const headerText = document.querySelector('#awaiting-header p');
@@ -190,57 +271,9 @@ window.nextStep = async (step) => {
       if (headerText) headerText.innerText = 'Connect your TON wallet to sign the transaction.';
     }
 
-    // Handle TON payment execution
+    // Handle manual click if auto-trigger fails
     if (sendTxBtn) {
-      sendTxBtn.onclick = async () => {
-        try {
-          // TipJar Merchant Wallet Address (Hardcoded for demo/custodial model)
-          // IMPORTANT: Update this to your production project wallet address!
-          const MERCHANT_ADDRESS = 'UQDwT-v0d7vO-u6nO7wA99N61v0p5wzP-5p8V4O0x_1W6fHj';
-          
-          showLoadingOverlay(true, 'Waiting for wallet signature...');
-          
-          const transaction = {
-            validUntil: Math.floor(Date.now() / 1000) + 60,
-            messages: [
-              {
-                address: MERCHANT_ADDRESS,
-                amount: "50000000", // 0.05 TON for demo
-              }
-            ]
-          };
-
-          const result = await tonConnectUI.sendTransaction(transaction);
-          console.log('[TipJar] TON Payment Success:', result);
-          
-          showLoadingOverlay(false);
-          if (statusEl) { statusEl.innerText = 'COMPLETED ✓'; statusEl.style.color = '#10B981'; }
-          if (sendTxBtn) sendTxBtn.style.display = 'none';
-          if (doneBtn) doneBtn.style.display = 'flex';
-          if (connectWrapper) connectWrapper.style.display = 'none';
-          
-          state.balance += state.selectedAmount;
-          showToast('Tip received! 💎');
-          showConfetti();
-          updateDynamicUI();
-
-          // Record in DB
-          if (dbCreator) {
-            await createTipRecord({
-              creatorId: dbCreator.id,
-              tipperName: 'TON User',
-              currency: 'TON',
-              cryptoAmount: 0.05,
-              usdValue: state.selectedAmount,
-              status: 'COMPLETED'
-            });
-          }
-        } catch (err) {
-          showLoadingOverlay(false);
-          console.error('[TipJar] TON Payment Error:', err);
-          showToast('Payment rejected or failed.');
-        }
-      };
+      sendTxBtn.onclick = () => App.handleTonPayment();
     }
     return;
   }

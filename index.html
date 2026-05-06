@@ -806,6 +806,25 @@
       <button onclick="nextStep(11)" style="position: absolute; top: 24px; left: 24px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.2); border: none; color: white; cursor: pointer; backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 101;">
         <i data-lucide="x" style="width: 24px; height: 24px;"></i>
       </button>
+    <!-- Step 13: Success / Thank You Screen -->
+    <div id="step-13" class="screen hidden" style="background: white; text-align: center; justify-content: center; align-items: center;">
+      <div id="lottie-container-success" style="width: 200px; height: 200px; margin-bottom: 24px;"></div>
+      <h1 style="font-size: 32px; margin-bottom: 12px; color: #10B981;">Tip Sent!</h1>
+      <p style="color: #6B7280; font-size: 16px; margin-bottom: 40px; padding: 0 40px;">
+        You just sent <span style="font-weight: 800; color: #111827;">$<span id="success-amount">0.00</span></span> to <span id="success-creator-name" style="font-weight: 800; color: #111827;">Alex Rivers</span>.
+      </p>
+      
+      <div style="background: #F0FDF4; border: 1px solid #BBF7D0; padding: 20px; border-radius: 24px; width: 100%; margin-bottom: 40px;">
+        <div style="font-size: 12px; color: #16A34A; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">Transaction Confirmed</div>
+        <div style="font-family: monospace; font-size: 12px; color: #6B7280; word-break: break-all;">TON_TX_SUCCESS_HASH</div>
+      </div>
+
+      <button class="btn-primary" style="width: 100%; background: #111827;" onclick="nextStep(4)">
+        Send Another Tip <i data-lucide="heart" style="width: 18px; height: 18px; margin-left: 8px; fill: white;"></i>
+      </button>
+      <button class="btn-secondary" style="width: 100%; margin-top: 12px; border: none; background: none; color: #6B7280;" onclick="location.reload()">
+        Return to Profile
+      </button>
     </div>
   </div>
 
