@@ -166,10 +166,28 @@ window.nextStep = async (step) => {
     this.playLottie('lottie-container-payment', '/coin-jar.json');
     
     if (tonConnectUI && tonConnectUI.connected) {
-      if (sendTxBtn) sendTxBtn.style.display = 'flex';
+      if (sendTxBtn) {
+        sendTxBtn.style.display = 'flex';
+        sendTxBtn.classList.add('pulse-ready');
+      }
       if (statusEl) { statusEl.innerText = 'READY TO SIGN'; statusEl.style.color = '#3B82F6'; }
+      
+      // Update header for connected state
+      const headerTitle = document.querySelector('#awaiting-header h1');
+      const headerText = document.querySelector('#awaiting-header p');
+      if (headerTitle) headerTitle.innerText = 'Confirm Payment';
+      if (headerText) headerText.innerText = 'Wallet linked! Tap confirm to sign the transaction.';
     } else {
-      if (sendTxBtn) sendTxBtn.style.display = 'none';
+      if (sendTxBtn) {
+        sendTxBtn.style.display = 'none';
+        sendTxBtn.classList.remove('pulse-ready');
+      }
+      
+      // Revert header if disconnected
+      const headerTitle = document.querySelector('#awaiting-header h1');
+      const headerText = document.querySelector('#awaiting-header p');
+      if (headerTitle) headerTitle.innerText = 'Connect Wallet';
+      if (headerText) headerText.innerText = 'Connect your TON wallet to sign the transaction.';
     }
 
     // Handle TON payment execution
