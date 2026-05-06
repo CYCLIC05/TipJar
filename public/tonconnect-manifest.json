@@ -1,5 +1,5 @@
 {
-  "url": "http://localhost:5173",
+  "url": "https://tip-jar-phi.vercel.app",
   "name": "TipJar",
-  "iconUrl": "http://localhost:5173/favicon.svg"
+  "iconUrl": "https://tip-jar-phi.vercel.app/favicon.svg"
 }

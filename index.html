@@ -59,122 +59,47 @@
       </div>
     </div>
     <!-- Step 1: Welcome -->
-    <div id="step-1" class="screen hidden" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
-      <div class="onboarding-progress-container">
-        <div class="onboarding-progress-bar"><div id="fill-1" class="onboarding-progress-fill"></div></div>
-        <div class="onboarding-progress-bar"><div id="fill-2" class="onboarding-progress-fill"></div></div>
-        <div class="onboarding-progress-bar"><div id="fill-3" class="onboarding-progress-fill"></div></div>
+    <div id="step-1" class="screen hidden" style="background: white; padding: 0; display: flex; flex-direction: column;">
+      <div id="card-welcome-bg" style="height: 45%; background: linear-gradient(135deg, #F79F1A 0%, #FBBF24 100%); border-bottom-left-radius: 60px; border-bottom-right-radius: 60px; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+        <div id="lottie-container-welcome" style="width: 260px; height: 260px; z-index: 2;"></div>
+        <div style="position: absolute; bottom: -20px; width: 120%; height: 60px; background: white; border-radius: 50%; filter: blur(20px); opacity: 0.3;"></div>
       </div>
-      <div style="position: absolute; top: 40px; right: 32px; z-index: 101;">
-        <button onclick="nextStep(3)" style="background: rgba(0,0,0,0.05); border: none; padding: 6px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; color: #6B7280; cursor: pointer;">Skip</button>
-      </div>
-      <h1>Support your favorite creators instantly</h1>
-      <p class="subtitle">The fastest way to show appreciation and get noticed by the creators you love.</p>
       
-      <div class="main-card" id="card-welcome">
-        <div class="avatar-stack">
-          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Felix" class="stack-avatar">
-          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Jasper" class="stack-avatar">
-          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow" class="stack-avatar">
-          <div class="stack-count">+1.2k</div>
+      <div style="padding: 40px 32px; flex: 1; display: flex; flex-direction: column; text-align: left;">
+        <div style="display: flex; gap: 8px; margin-bottom: 32px;">
+          <div style="width: 40px; height: 6px; background: var(--primary); border-radius: 100px;"></div>
+          <div style="width: 12px; height: 6px; background: #F3F4F6; border-radius: 100px;"></div>
         </div>
-        <div class="floating-pill">
-          <i data-lucide="heart" style="color: #EF4444; width: 18px; height: 18px; fill: #EF4444;"></i>
-          <span>New Tip: $25.00</span>
-        </div>
+        
+        <h1 style="font-size: 42px; line-height: 1.1; margin-bottom: 20px; animation: slideUp 0.6s ease-out; text-align: left;">The Future of <span style="color: var(--primary);">Support</span></h1>
+        <p style="color: #6B7280; font-size: 18px; line-height: 1.6; margin-bottom: 40px; animation: slideUp 0.8s ease-out;">Experience the fastest and most beautiful way to tip your favorite creators on the TON blockchain.</p>
+        
+        <button class="btn-primary" style="width: 100%; height: 64px; font-size: 18px; margin-top: auto; border-radius: 20px; box-shadow: 0 20px 40px rgba(247, 159, 26, 0.3);" onclick="nextStep(3)">
+          Get Started <i data-lucide="arrow-right" style="width: 20px; height: 20px; margin-left: 8px;"></i>
+        </button>
       </div>
-
-      <div class="pagination-dots">
-        <div class="dot active"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-      </div>
-
-      <button class="btn-primary" onclick="nextStep(2)">
-        Next <i data-lucide="arrow-right" style="width: 20px; height: 20px;"></i>
-      </button>
-
-      <!-- Footer removed -->
-    </div>
-
-    <!-- Step 2: Interests -->
-    <div id="step-2" class="screen hidden" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
-      <div class="onboarding-progress-container">
-        <div class="onboarding-progress-bar"><div class="onboarding-progress-fill finished"></div></div>
-        <div class="onboarding-progress-bar"><div id="fill-2" class="onboarding-progress-fill"></div></div>
-        <div class="onboarding-progress-bar"><div id="fill-3" class="onboarding-progress-fill"></div></div>
-      </div>
-      <div style="position: absolute; top: 40px; right: 32px; z-index: 101;">
-        <button onclick="nextStep(4)" style="background: rgba(0,0,0,0.05); border: none; padding: 6px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; color: #6B7280; cursor: pointer;">Skip</button>
-      </div>
-      <h1>What are you into?</h1>
-      <p class="subtitle">Select your interests to find creators you'll love to support.</p>
-      
-      <div class="interests-grid">
-        <button class="btn-outline" onclick="toggleInterest(this, 'Gaming')"><i data-lucide="gamepad-2"></i> Gaming</button>
-        <button class="btn-outline" onclick="toggleInterest(this, 'Art')"><i data-lucide="palette"></i> Art</button>
-        <button class="btn-outline" onclick="toggleInterest(this, 'Music')"><i data-lucide="music"></i> Music</button>
-        <button class="btn-outline" onclick="toggleInterest(this, 'Tech')"><i data-lucide="cpu"></i> Tech</button>
-        <button class="btn-outline" onclick="toggleInterest(this, 'Education')"><i data-lucide="graduation-cap"></i> Education</button>
-        <button class="btn-outline" onclick="toggleInterest(this, 'Lifestyle')"><i data-lucide="heart"></i> Lifestyle</button>
-      </div>
-
-      <div class="pagination-dots">
-        <div class="dot"></div>
-        <div class="dot active"></div>
-        <div class="dot"></div>
-      </div>
-
-      <div class="nav-buttons">
-        <button class="btn-secondary" onclick="nextStep(1)">Back <span class="icon-circle"><i data-lucide="help-circle" style="width: 12px; height: 12px;"></i></span></button>
-        <button class="btn-primary" onclick="nextStep(3)">Next <i data-lucide="arrow-right" style="width: 20px; height: 20px;"></i></button>
-      </div>
-
-      <!-- Footer removed -->
     </div>
 
     <!-- Step 3: Ready -->
-    <div id="step-3" class="screen hidden" style="text-align: center; display: flex; flex-direction: column; align-items: center;">
-      <div class="onboarding-progress-container">
-        <div class="onboarding-progress-bar"><div class="onboarding-progress-fill finished"></div></div>
-        <div class="onboarding-progress-bar"><div class="onboarding-progress-fill finished"></div></div>
-        <div class="onboarding-progress-bar"><div id="fill-3" class="onboarding-progress-fill"></div></div>
+    <div id="step-3" class="screen hidden" style="background: #111827; padding: 0; display: flex; flex-direction: column;">
+      <div id="card-ready-bg" style="height: 45%; background: #111827; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+        <div style="position: absolute; width: 300px; height: 300px; background: var(--primary); opacity: 0.15; filter: blur(80px); border-radius: 50%;"></div>
+        <div id="lottie-container-ready" style="width: 280px; height: 280px; z-index: 2;"></div>
       </div>
-      <div style="position: absolute; top: 40px; right: 32px; z-index: 101;">
-        <button onclick="nextStep(4)" style="background: rgba(0,0,0,0.05); border: none; padding: 6px 12px; border-radius: 100px; font-size: 11px; font-weight: 700; color: #6B7280; cursor: pointer;">Skip</button>
-      </div>
-      <h1>You're all set!</h1>
-      <p class="subtitle">Find your favorite creators and show them some love with a quick tip.</p>
       
-      <div class="input-group" style="margin-bottom: 24px; background: white; border: 1.5px solid #F3F4F6; padding: 14px 20px; border-radius: 16px; display: flex; align-items: center; gap: 12px;">
-        <i data-lucide="search" style="width: 20px; height: 20px; color: #9CA3AF;"></i>
-        <input type="text" placeholder="Search creators, artists, gamers..." style="border: none; outline: none; flex: 1; font-size: 15px; font-family: inherit;" oninput="handleSearch(this.value)">
-      </div>
-      <div class="main-card" id="card-ready">
-        <div class="avatar-stack">
-          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Felix" class="stack-avatar">
-          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Jasper" class="stack-avatar">
-          <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=Shadow" class="stack-avatar">
-          <div class="stack-count">+500</div>
+      <div style="padding: 40px 32px; flex: 1; display: flex; flex-direction: column; text-align: left; background: white; border-top-left-radius: 60px; border-top-right-radius: 60px;">
+        <div style="display: flex; gap: 8px; margin-bottom: 32px;">
+          <div style="width: 12px; height: 6px; background: #F3F4F6; border-radius: 100px;"></div>
+          <div style="width: 40px; height: 6px; background: #10B981; border-radius: 100px;"></div>
         </div>
-        <div class="floating-pill">
-          <i data-lucide="user-plus" style="width: 14px; height: 14px; color: var(--primary);"></i>
-          <span>New Creator: @sarah_art</span>
-        </div>
+        
+        <h1 style="font-size: 42px; line-height: 1.1; margin-bottom: 20px; animation: slideUp 0.6s ease-out;">Ready to <span style="color: #10B981;">Make Waves?</span></h1>
+        <p style="color: #6B7280; font-size: 18px; line-height: 1.6; margin-bottom: 40px; animation: slideUp 0.8s ease-out;">Join the community and start supporting creators with just one tap.</p>
+        
+        <button class="btn-primary" style="width: 100%; height: 64px; font-size: 18px; margin-top: auto; border-radius: 20px; background: #111827; color: white;" onclick="nextStep(7)">
+          Launch My Dashboard <i data-lucide="zap" style="width: 20px; height: 20px; margin-left: 8px; fill: white;"></i>
+        </button>
       </div>
-
-      <div class="pagination-dots">
-        <div class="dot"></div>
-        <div class="dot"></div>
-        <div class="dot active"></div>
-      </div>
-
-      <div class="nav-buttons">
-        <button class="btn-secondary" style="background: transparent; color: #F79F1A; border: none; box-shadow: none;" onclick="nextStep(2)">Back</button>
-        <button class="btn-primary" style="flex: 2;" onclick="nextStep(4)">Explore Creators <i data-lucide="search" style="width: 18px; height: 18px;"></i></button>
-      </div>
-
-      <!-- Footer removed -->
     </div>
 
     <!-- Step 4: Tipping Profile -->

@@ -228,10 +228,17 @@ window.nextStep = async (step) => {
     if (doneBtn) doneBtn.style.display = 'none';
     if (connectWrapper) connectWrapper.style.display = 'flex';
 
-    // Load animation
-    this.playLottie('lottie-container-payment', '/coin-jar.json');
-    
-    if (tonConnectUI && tonConnectUI.connected) {
+    // Load premium animations
+    if (step === 1) {
+      App.playLottie('lottie-container-welcome', '/coin-jar.json');
+      if (fill) fill.classList.add('active');
+    }
+
+    if (step === 3) {
+      App.playLottie('lottie-container-ready', '/coin-jar.json');
+    }
+
+    if (step === 6) {
       if (sendTxBtn) {
         sendTxBtn.style.display = 'flex';
         sendTxBtn.classList.add('pulse-ready');
@@ -279,6 +286,7 @@ window.nextStep = async (step) => {
   }
 
   if (step === 7) {
+    localStorage.setItem('tipjar_onboarded', 'true');
     transitionScreen(currentScreen, nextScreen);
     if (window.animateGoal) setTimeout(window.animateGoal, 400);
   } else {
@@ -320,10 +328,10 @@ const startOnboardingTimer = (step) => {
   }, 100);
 
   state.onboardingTimer = setTimeout(() => {
-    if (step < 3) {
-      nextStep(step + 1);
+    if (step === 1) {
+      nextStep(3); // Skip step 2 (Interests)
     } else if (step === 3) {
-      nextStep(4); // Go to Profile
+      nextStep(7); // Go to Dashboard
     }
   }, 3000);
 };
@@ -1328,10 +1336,21 @@ document.addEventListener('DOMContentLoaded', async () => {
           state.creator.handle = `@${creator.username || 'creator'}`;
           state.creator.avatar = creator.avatar_url || state.creator.avatar;
           state.payoutWallet = creator.payout_wallet;
+
+          // SKIP: Go to dashboard but DON'T return, allow rest of init to run
+          console.log('[TipJar] 🏠 Returning creator recognized.');
+          nextStep(7);
         }
       }
     } catch (err) {
       console.warn('[TipJar] Offline mode');
+    }
+
+    // Persistent Onboarding Check
+    const hasOnboarded = localStorage.getItem('tipjar_onboarded') === 'true';
+    if (hasOnboarded && !creatorIdParam) {
+      console.log('[TipJar] ⏩ Onboarding already completed.');
+      setTimeout(() => nextStep(7), 100); // Small delay to ensure App.init finishes
     }
   }
 
