@@ -2,10 +2,11 @@
 import { supabase } from './src/lib/supabase.js';
 import { initTelegramAuth } from './src/lib/auth.js';
 import { getCreatorTips, createTipRecord, updateCreator } from './src/lib/db.js';
-import { createInvoice, checkInvoicePaid } from './src/lib/cryptopay.js';
+import { TonConnectUI } from '@tonconnect/ui';
 
 // The authenticated creator record from Supabase (populated on load)
 let dbCreator = null;
+let tonConnectUI = null;
 
 // Application State
 const state = {
@@ -47,9 +48,65 @@ const state = {
 const App = {
   init() {
     this.bindEvents();
+    this.initTonConnect();
     this.render();
     if (window.lucide) window.lucide.createIcons();
     startOnboardingTimer(1);
+  },
+
+  initTonConnect() {
+    try {
+      const manifestPath = `${window.location.origin}/tonconnect-manifest.json`;
+      console.log('[TipJar] 📦 Initializing TON Connect with manifest:', manifestPath);
+
+      tonConnectUI = new TonConnectUI({
+        manifestUrl: manifestPath, 
+        buttonRootId: 'ton-connect-wrapper'
+      });
+
+      // Force QR code modal on desktop to avoid protocol link errors
+      tonConnectUI.uiOptions = {
+        twaReturnUrl: 'https://t.me/TipJarBot'
+      };
+
+      tonConnectUI.onStatusChange(wallet => {
+        if (wallet) {
+          state.tonAddress = wallet.account.address;
+          const statusEl = document.getElementById('receipt-status');
+          const sendTxBtn = document.getElementById('send-tx-btn');
+          if (statusEl) { statusEl.innerText = 'READY TO SIGN'; statusEl.style.color = '#3B82F6'; }
+          if (sendTxBtn) sendTxBtn.style.display = 'flex';
+          
+          console.log('[TipJar] 👛 Wallet Connected:', state.tonAddress);
+        } else {
+          state.tonAddress = null;
+          const sendTxBtn = document.getElementById('send-tx-btn');
+          if (sendTxBtn) sendTxBtn.style.display = 'none';
+          console.log('[TipJar] 👛 Wallet Disconnected');
+        }
+      });
+    } catch (err) {
+      console.warn('[TipJar] TonConnect Initialization Error:', err);
+    }
+  },
+
+  // Lottie Helper
+  playLottie(containerId, path) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    // Clear previous
+    container.innerHTML = '';
+    
+    if (window.lottie) {
+      window.lottie.loadAnimation({
+        container: container,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        path: path
+      });
+    }
   },
 
   bindEvents() {
@@ -74,89 +131,98 @@ window.nextStep = async (step) => {
     state.onboardingTimer = null;
   }
 
-  // Step 6 — Real Crypto Pay invoice
+  // If authenticated as a creator, skip onboarding steps 1-3 and go straight to dashboard.
+  // We allow step 4, 5, 6 (tipping flow) so they can preview their profile.
+  if (dbCreator && step > 1 && step < 4) {
+    const dashboardScreen = document.getElementById('step-7');
+    if (dashboardScreen) {
+      transitionScreen(currentScreen, dashboardScreen);
+      state.currentStep = 7;
+      updateDynamicUI();
+      return;
+    }
+  }
+
+  // Step 6 — Payment Logic (TON Wallet Exclusive)
   if (step === 6) {
-    const tipMsgInput = document.getElementById('tip-message');
-    if (tipMsgInput) state.tipMessage = tipMsgInput.value;
+    const sendTxBtn = document.getElementById('send-tx-btn');
+    const doneBtn = document.getElementById('receipt-done-btn');
+    const connectWrapper = document.getElementById('ton-connect-wrapper');
+    const statusEl = document.getElementById('receipt-status');
+    const methodEl = document.getElementById('receipt-method');
+    const txEl = document.getElementById('receipt-tx-id');
 
-    const currencyMap = { ton: 'TON', usdt: 'USDT', trx: 'TRX', eth: 'ETH' };
-    const currency = currencyMap[state.selectedMethod] || 'TON';
+    if (methodEl) methodEl.innerText = 'TON Wallet';
+    if (txEl) txEl.innerText = 'Self-Custody Transfer';
+    if (statusEl) { statusEl.innerText = 'CONNECT WALLET'; statusEl.style.color = '#F79F1A'; }
+    
+    transitionScreen(currentScreen, nextScreen);
+    state.currentStep = step;
 
-    showLoadingOverlay(true, 'Creating Secure Invoice...');
+    if (doneBtn) doneBtn.style.display = 'none';
+    if (connectWrapper) connectWrapper.style.display = 'flex';
 
-    try {
-      // Create the invoice via Crypto Pay API
-      const invoice = await createInvoice({
-        currency,
-        cryptoAmount: state.selectedAmount,
-        creatorName: state.creator.name,
-        message: state.tipMessage,
-        payload: JSON.stringify({ creator_id: dbCreator?.id, currency, usd: state.selectedAmount }),
-      });
+    // Load animation
+    this.playLottie('lottie-container-payment', '/coin-jar.json');
+    
+    if (tonConnectUI && tonConnectUI.connected) {
+      if (sendTxBtn) sendTxBtn.style.display = 'flex';
+      if (statusEl) { statusEl.innerText = 'READY TO SIGN'; statusEl.style.color = '#3B82F6'; }
+    } else {
+      if (sendTxBtn) sendTxBtn.style.display = 'none';
+    }
 
-      // Save a PENDING tip record in Supabase
-      if (dbCreator) {
-        await createTipRecord({
-          creatorId: dbCreator.id,
-          tipperName: 'Anonymous',
-          message: state.tipMessage,
-          currency,
-          cryptoAmount: state.selectedAmount,
-          usdValue: state.selectedAmount,
-          invoiceId: String(invoice.invoice_id),
-          payUrl: invoice.pay_url,
-        });
-      }
-
-      // Update receipt screen with real data
-      const methodEl = document.getElementById('receipt-method');
-      const txEl = document.getElementById('receipt-tx-id');
-      const statusEl = document.getElementById('receipt-status');
-      if (methodEl) methodEl.innerText = `${currency} via CryptoPay`;
-      if (txEl) txEl.innerText = `Invoice #${invoice.invoice_id}`;
-      if (statusEl) { statusEl.innerText = 'AWAITING PAYMENT'; statusEl.style.color = '#F79F1A'; }
-
-      showLoadingOverlay(false);
-      transitionScreen(currentScreen, nextScreen);
-      state.currentStep = step;
-
-      // Open the Crypto Pay native payment screen
-      if (invoice.pay_url) {
-        if (window.Telegram?.WebApp) {
-          window.Telegram.WebApp.openLink(invoice.pay_url);
-        } else {
-          window.open(invoice.pay_url, '_blank');
-        }
-      }
-
-      // Poll for payment confirmation (every 3s for up to 3 min)
-      let attempts = 0;
-      const pollInterval = setInterval(async () => {
-        attempts++;
+    // Handle TON payment execution
+    if (sendTxBtn) {
+      sendTxBtn.onclick = async () => {
         try {
-          const paid = await checkInvoicePaid(invoice.invoice_id);
-          if (paid) {
-            clearInterval(pollInterval);
-            if (statusEl) { statusEl.innerText = 'COMPLETED ✓'; statusEl.style.color = '#10B981'; }
-            state.balance += state.selectedAmount;
-            state.notifications.unshift({
-              id: Date.now(),
-              text: `New tip of $${state.selectedAmount.toFixed(2)} received (${currency})`,
-              time: 'Just now',
-              type: 'tip',
-            });
-            showConfetti();
-            showCoinRain();
-            updateDynamicUI();
-          }
-        } catch { /* ignore poll errors */ }
-        if (attempts >= 60) clearInterval(pollInterval); // stop after 3 min
-      }, 3000);
+          // TipJar Merchant Wallet Address (Hardcoded for demo/custodial model)
+          // IMPORTANT: Update this to your production project wallet address!
+          const MERCHANT_ADDRESS = 'UQDwT-v0d7vO-u6nO7wA99N61v0p5wzP-5p8V4O0x_1W6fHj';
+          
+          showLoadingOverlay(true, 'Waiting for wallet signature...');
+          
+          const transaction = {
+            validUntil: Math.floor(Date.now() / 1000) + 60,
+            messages: [
+              {
+                address: MERCHANT_ADDRESS,
+                amount: "50000000", // 0.05 TON for demo
+              }
+            ]
+          };
 
-    } catch (err) {
-      showLoadingOverlay(false);
-      console.error('[TipJar] Invoice error:', err);
-      showToast('Payment failed. Please try again.');
+          const result = await tonConnectUI.sendTransaction(transaction);
+          console.log('[TipJar] TON Payment Success:', result);
+          
+          showLoadingOverlay(false);
+          if (statusEl) { statusEl.innerText = 'COMPLETED ✓'; statusEl.style.color = '#10B981'; }
+          if (sendTxBtn) sendTxBtn.style.display = 'none';
+          if (doneBtn) doneBtn.style.display = 'flex';
+          if (connectWrapper) connectWrapper.style.display = 'none';
+          
+          state.balance += state.selectedAmount;
+          showToast('Tip received! 💎');
+          showConfetti();
+          updateDynamicUI();
+
+          // Record in DB
+          if (dbCreator) {
+            await createTipRecord({
+              creatorId: dbCreator.id,
+              tipperName: 'TON User',
+              currency: 'TON',
+              cryptoAmount: 0.05,
+              usdValue: state.selectedAmount,
+              status: 'COMPLETED'
+            });
+          }
+        } catch (err) {
+          showLoadingOverlay(false);
+          console.error('[TipJar] TON Payment Error:', err);
+          showToast('Payment rejected or failed.');
+        }
+      };
     }
     return;
   }
@@ -928,6 +994,7 @@ const updateDynamicUI = () => {
     let percent = Math.min(100, Math.round((state.goal.current / state.goal.target) * 100));
     if(isNaN(percent)) percent = 0;
     if (goalPercentText) goalPercentText.innerText = `${percent}%`;
+    if (window.animateGoal) window.animateGoal();
   }
 
   // Update Notifications (Empty State Handling)
@@ -1005,11 +1072,14 @@ const showLoadingOverlay = (show, message = 'Processing...') => {
     overlay.id = 'loading-overlay';
     overlay.innerHTML = `
       <div style="text-align: center;">
-        <div class="spinner" style="margin: 0 auto 16px;"></div>
+        <div id="lottie-container-overlay" style="width: 150px; height: 150px; margin: 0 auto 16px;"></div>
         <div id="loading-message" style="font-weight: 600; color: #111827;">${message}</div>
       </div>
     `;
     document.getElementById('app').appendChild(overlay);
+    
+    // Play animation
+    this.playLottie('lottie-container-overlay', '/coin-jar.json');
   }
   
   const msgEl = document.getElementById('loading-message');
@@ -1030,115 +1100,6 @@ const showToast = (message) => {
   }, 3000);
 };
 
-// --- Initialization ---
-document.addEventListener('DOMContentLoaded', async () => {
-  // Set images
-  const welcomeCard = document.getElementById('card-welcome');
-  const readyCard   = document.getElementById('card-ready');
-  const alexAvatar  = document.getElementById('alex-avatar');
-  const summaryAvatar = document.getElementById('summary-avatar');
-
-  if (welcomeCard) welcomeCard.style.backgroundImage = 'url(/creator_card.png)';
-  if (readyCard)   readyCard.style.backgroundImage   = 'url(/creator_card.png)';
-
-  // -------------------------------------------------------
-  // Check URL params: ?creator=<uuid>
-  // This is set when a tipper opens a creator's deep link
-  // -------------------------------------------------------
-  const urlParams      = new URLSearchParams(window.location.search);
-  const creatorIdParam = urlParams.get('creator');
-
-  if (creatorIdParam) {
-    // Tipper mode: load the specific creator's profile
-    try {
-      const { data: targetCreator } = await supabase
-        .from('creators')
-        .select('id, telegram_id, display_name, username, avatar_url, goal_title')
-        .eq('id', creatorIdParam)
-        .single();
-
-      if (targetCreator) {
-        state.creator.name   = targetCreator.display_name;
-        state.creator.handle = `@${targetCreator.username || 'creator'}`;
-        state.creator.avatar = targetCreator.avatar_url || state.creator.avatar;
-        state.selectedCreatorId = targetCreator.id;
-
-        // Get tipper's Telegram identity
-        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-        if (tgUser) {
-          state.tipperName   = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim();
-          state.tipperHandle = tgUser.username ? `@${tgUser.username}` : null;
-        }
-
-        // Skip onboarding — jump straight to tipping
-        updateDynamicUI();
-        nextStep(4);
-        console.log('[TipJar] Tipper mode: tipping', targetCreator.display_name);
-      }
-    } catch (err) {
-      console.warn('[TipJar] Could not load creator from URL param:', err.message);
-    }
-  } else {
-    // -------------------------------------------------------
-    // Creator mode: authenticate as the creator
-    // -------------------------------------------------------
-    try {
-      dbCreator = await initTelegramAuth();
-      console.log('[TipJar] ✅ Supabase connected. Creator:', dbCreator.display_name);
-
-      // Sync live DB data → local state
-      state.creator.name   = dbCreator.display_name || state.creator.name;
-      state.creator.handle = `@${dbCreator.username || 'creator'}`;
-      state.creator.avatar = dbCreator.avatar_url   || state.creator.avatar;
-      state.balance        = dbCreator.balance_usd  ?? state.balance;
-      state.goal.title     = dbCreator.goal_title   || state.goal.title;
-      state.goal.target    = dbCreator.goal_target  || state.goal.target;
-      state.goal.current   = state.balance;
-
-      // Restore saved wallet address
-      if (dbCreator.withdrawal_wallet) {
-        state.walletAddress = dbCreator.withdrawal_wallet;
-      }
-
-      // Load recent tips from the database
-      const tips = await getCreatorTips(dbCreator.id, 10);
-      if (tips.length > 0) {
-        state.notifications = tips.map(t => ({
-          id: t.id,
-          text: `${t.tipper_name} tipped ${t.crypto_currency}: $${parseFloat(t.usd_value).toFixed(2)}`,
-          time: 'recently',
-          type: 'tip',
-          message: t.message,
-        }));
-      }
-    } catch (err) {
-      console.warn('[TipJar] ⚠️ Supabase not reachable — running in offline/demo mode.', err.message);
-    }
-
-    // Start onboarding auto-advance (only in creator mode)
-    startOnboardingTimer(1);
-  }
-
-  // Update avatars
-  if (alexAvatar)    alexAvatar.src    = state.creator.avatar;
-  if (summaryAvatar) summaryAvatar.src = state.creator.avatar;
-
-  // window.animateGoal definition
-  window.animateGoal = () => {
-    const progressBar = document.getElementById('goal-progress-bar');
-    if (progressBar && state.goal) {
-      progressBar.style.width = '0%';
-      void progressBar.offsetWidth;
-      let percent = Math.min(100, Math.round((state.goal.current / state.goal.target) * 100));
-      if (isNaN(percent)) percent = 0;
-      setTimeout(() => progressBar.style.width = `${percent}%`, 100);
-    }
-  };
-
-  window.animateGoal();
-  if (window.lucide) window.lucide.createIcons();
-  updateDynamicUI();
-});
 
 // ============================================================
 // First-Tip Celebration
@@ -1211,10 +1172,40 @@ window.openQRModal = () => {
     ? `https://t.me/TipJarBot?start=creator_${telegramId}`
     : `https://tipjar.app/${dbCreator?.username || 'creator'}`;
 
+  // Generate real QR code using a public API
+  const qrImage = document.getElementById('qr-image');
+  const qrLoader = document.getElementById('qr-loader');
+  if (qrImage) {
+    qrImage.style.display = 'none';
+    if (qrLoader) qrLoader.style.display = 'block';
+    
+    qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(link)}&bgcolor=FFFFFF&color=111827&margin=10`;
+    qrImage.onload = () => {
+      qrImage.style.display = 'block';
+      if (qrLoader) qrLoader.style.display = 'none';
+    };
+  }
+
   const copyBtn = modal.querySelector('button.btn-primary');
   if (copyBtn) copyBtn.onclick = () => copyToClipboard(link);
 
   modal.classList.add('visible');
+};
+
+window.closeQRModal = () => {
+  const modal = document.getElementById('qr-modal');
+  if (modal) modal.classList.remove('visible');
+};
+
+window.animateGoal = () => {
+  const progressBar = document.getElementById('goal-progress-bar');
+  if (progressBar && state.goal) {
+    progressBar.style.width = '0%';
+    void progressBar.offsetWidth;
+    let percent = Math.min(100, Math.round((state.goal.current / state.goal.target) * 100));
+    if (isNaN(percent)) percent = 0;
+    setTimeout(() => progressBar.style.width = `${percent}%`, 100);
+  }
 };
 
 // Update Settings share link to use real bot link
@@ -1227,3 +1218,78 @@ window.updateSettingsShareLink = () => {
   }
 };
 
+
+// --- Initialization ---
+document.addEventListener('DOMContentLoaded', async () => {
+  App.init();
+  
+  // Set images
+  const welcomeCard = document.getElementById('card-welcome');
+  const readyCard   = document.getElementById('card-ready');
+  const alexAvatar  = document.getElementById('alex-avatar');
+  const summaryAvatar = document.getElementById('summary-avatar');
+
+  if (welcomeCard) welcomeCard.style.backgroundImage = 'url(/creator_card.png)';
+  if (readyCard)   readyCard.style.backgroundImage   = 'url(/creator_card.png)';
+
+  const urlParams      = new URLSearchParams(window.location.search);
+  const creatorIdParam = urlParams.get('creator');
+
+  if (creatorIdParam) {
+    try {
+      const { data: targetCreator } = await supabase
+        .from('creators')
+        .select('id, telegram_id, display_name, username, avatar_url, goal_title')
+        .eq('id', creatorIdParam)
+        .single();
+
+      if (targetCreator) {
+        state.creator.name   = targetCreator.display_name;
+        state.creator.handle = `@${targetCreator.username || 'creator'}`;
+        state.creator.avatar = targetCreator.avatar_url || state.creator.avatar;
+        state.selectedCreatorId = targetCreator.id;
+
+        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+        if (tgUser) {
+          state.tipperName   = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim();
+          state.tipperHandle = tgUser.username ? `@${tgUser.username}` : null;
+        }
+
+        updateDynamicUI();
+        nextStep(4);
+      }
+    } catch (err) {
+      console.warn('[TipJar] Error loading creator:', err);
+    }
+  } else {
+    try {
+      const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+      if (tgUser) {
+        const { data: creator } = await supabase
+          .from('creators')
+          .select('*')
+          .eq('telegram_id', tgUser.id.toString())
+          .single();
+
+        if (creator) {
+          dbCreator = creator;
+          state.creator.name = creator.display_name;
+          state.creator.handle = `@${creator.username || 'creator'}`;
+          state.creator.avatar = creator.avatar_url || state.creator.avatar;
+          state.payoutWallet = creator.payout_wallet;
+        }
+      }
+    } catch (err) {
+      console.warn('[TipJar] Offline mode');
+    }
+  }
+
+  if (alexAvatar) alexAvatar.src = state.creator.avatar;
+  if (summaryAvatar) summaryAvatar.src = state.creator.avatar;
+  const receiptAvatar = document.getElementById('receipt-avatar');
+  if (receiptAvatar) receiptAvatar.src = state.creator.avatar;
+
+  document.querySelectorAll('.alex-name').forEach(el => el.innerText = state.creator.name);
+  window.animateGoal();
+  updateDynamicUI();
+});

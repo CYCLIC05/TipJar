@@ -12,6 +12,8 @@
     "vite": "^8.0.10"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.1"
+    "@lottiefiles/dotlottie-react": "^0.19.1",
+    "@supabase/supabase-js": "^2.105.1",
+    "@tonconnect/ui": "^2.4.4"
   }
 }

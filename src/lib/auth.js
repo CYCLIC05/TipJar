@@ -18,6 +18,7 @@ function getTelegramUser() {
       username: user.username || `user_${user.id}`,
       display_name: `${user.first_name || ''} ${user.last_name || ''}`.trim(),
       avatar_url: user.photo_url || `https://api.dicebear.com/7.x/adventurer/svg?seed=${user.id}`,
+      is_premium: !!user.is_premium
     };
   }
 

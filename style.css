@@ -35,6 +35,11 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  /* Prevent bounce scroll on mobile */
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
 }
 
 #app {
@@ -54,7 +59,7 @@ body {
 
 @media (max-width: 500px) {
   #app {
-    height: 100vh;
+    height: 100%;
     max-height: none;
     border-radius: 0;
     border: none;
@@ -912,7 +917,7 @@ h1 {
 
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   margin-bottom: 32px;
 }
@@ -1519,3 +1524,33 @@ h1 {
   margin-top: auto;
 }
 
+
+/* Telegram Premium Badge */
+.premium-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, #0088CC 0%, #00AEEF 100%);
+  border-radius: 50%;
+  border: 3px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 10;
+}
+
+.premium-badge i {
+  width: 12px !important;
+  height: 12px !important;
+  fill: white;
+  color: white;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
