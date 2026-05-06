@@ -127,6 +127,23 @@
         </div>
       </div>
 
+      <!-- Wall of Support (Recent Tips) -->
+      <div id="wall-of-support" style="padding: 0 24px; margin-bottom: 32px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <h3 style="font-size: 14px; font-weight: 800; color: #111827; text-transform: uppercase; letter-spacing: 0.05em;">Recent Supporters</h3>
+          <span id="supporter-count" style="font-size: 11px; font-weight: 700; color: var(--primary); background: #FFFBEB; padding: 2px 8px; border-radius: 100px;">0 Tippers</span>
+        </div>
+        <div id="supporters-list" style="display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scroll-behavior: smooth; -webkit-overflow-scrolling: touch;">
+          <!-- Supporters will be injected here -->
+          <div style="min-width: 140px; padding: 16px; background: #F9FAFB; border-radius: 20px; border: 1px dashed #E5E7EB; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            <div style="width: 32px; height: 32px; background: #F3F4F6; border-radius: 50%; margin-bottom: 8px; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="users" style="width: 16px; height: 16px; color: #9CA3AF;"></i>
+            </div>
+            <div style="font-size: 10px; color: #9CA3AF; font-weight: 600;">Be the first!</div>
+          </div>
+        </div>
+      </div>
+
       <div class="tip-options">
         <div class="tip-card" data-amount="1" onclick="selectTip(1)">
           <div class="tip-amount">$1</div>

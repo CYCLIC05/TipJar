@@ -107,8 +107,15 @@ const App = {
         sendTxBtn.style.pointerEvents = 'none';
       }
 
+      if (!tonConnectUI.connected) {
+        showLoadingOverlay(false);
+        showToast('Please connect your wallet first!');
+        nextStep(6); // Reset to connect state
+        return;
+      }
+
       const transaction = {
-        validUntil: Math.floor(Date.now() / 1000) + 300,
+        validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutes
         messages: [
           {
             address: MERCHANT_ADDRESS,
@@ -117,6 +124,7 @@ const App = {
         ]
       };
 
+      console.log('[TipJar] 🚀 Sending Transaction:', transaction);
       const result = await tonConnectUI.sendTransaction(transaction);
       console.log('[TipJar] ✅ TON Payment Success:', result);
       
@@ -143,6 +151,7 @@ const App = {
           creatorId: targetId,
           tipperName: state.tipperName || 'Supporter',
           amountUsd: state.selectedAmount,
+          message: state.selectedMessage || '',
           currency: 'TON',
           txId: result.boc || 'TON_TRANSFER'
         });
@@ -175,6 +184,56 @@ const App = {
     if (tonConnectUI) {
       await tonConnectUI.disconnect();
       nextStep(6); // Refresh step 6 UI
+    }
+  },
+
+  // Load Recent Supporters for the Profile Wall
+  async loadRecentSupporters() {
+    const list = document.getElementById('supporters-list');
+    const countEl = document.getElementById('supporter-count');
+    const creatorId = state.selectedCreatorId || (dbCreator ? dbCreator.id : null);
+    
+    if (!list || !creatorId) return;
+
+    try {
+      const { data: tips, error } = await supabase
+        .from('tips')
+        .select('*')
+        .eq('creator_id', creatorId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      if (countEl) countEl.innerText = `${tips.length} Tippers`;
+
+      if (tips.length === 0) {
+        list.innerHTML = `
+          <div style="min-width: 140px; padding: 16px; background: #F9FAFB; border-radius: 20px; border: 1px dashed #E5E7EB; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+            <div style="width: 32px; height: 32px; background: #F3F4F6; border-radius: 50%; margin-bottom: 8px; display: flex; align-items: center; justify-content: center;">
+              <i data-lucide="users" style="width: 16px; height: 16px; color: #9CA3AF;"></i>
+            </div>
+            <div style="font-size: 10px; color: #9CA3AF; font-weight: 600;">Be the first!</div>
+          </div>
+        `;
+        if (window.lucide) window.lucide.createIcons();
+        return;
+      }
+
+      list.innerHTML = tips.map(tip => `
+        <div style="min-width: 160px; padding: 16px; background: #FFFFFF; border: 1px solid #F3F4F6; border-radius: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=${tip.tipper_name}" style="width: 28px; height: 28px; border-radius: 50%; background: #F3F4F6;">
+            <div>
+              <div style="font-size: 12px; font-weight: 800; color: #111827;">${tip.tipper_name}</div>
+              <div style="font-size: 10px; color: #10B981; font-weight: 700;">$${tip.amount_usd}</div>
+            </div>
+          </div>
+          ${tip.message ? `<div style="font-size: 11px; color: #6B7280; line-height: 1.4; font-style: italic; background: #F9FAFB; padding: 8px 12px; border-radius: 14px;">"${tip.message}"</div>` : ''}
+        </div>
+      `).join('');
+    } catch (err) {
+      console.warn('[TipJar] Error loading supporters:', err);
     }
   },
 
@@ -231,6 +290,11 @@ window.nextStep = async (step) => {
     }
   }
 
+  // Step 4 — Load Recent Supporters for the Wall
+  if (step === 4) {
+    App.loadRecentSupporters();
+  }
+
   // Step 6 — Payment Logic (TON Wallet Exclusive)
   if (step === 6) {
     const sendTxBtn = document.getElementById('send-tx-btn');
@@ -244,6 +308,18 @@ window.nextStep = async (step) => {
     if (txEl) txEl.innerText = 'Self-Custody Transfer';
     if (statusEl) { statusEl.innerText = 'CONNECT WALLET'; statusEl.style.color = '#F79F1A'; }
     
+    const msgInput = document.getElementById('tip-message');
+    if (msgInput) state.selectedMessage = msgInput.value;
+
+    const receiptMsgContainer = document.getElementById('receipt-message-container');
+    const receiptMsgText = document.getElementById('receipt-message-text');
+    if (state.selectedMessage && receiptMsgContainer && receiptMsgText) {
+      receiptMsgContainer.style.display = 'block';
+      receiptMsgText.innerText = state.selectedMessage;
+    } else if (receiptMsgContainer) {
+      receiptMsgContainer.style.display = 'none';
+    }
+
     transitionScreen(currentScreen, nextScreen);
     state.currentStep = step;
 
