@@ -74,11 +74,12 @@ const App = {
           state.tonAddress = wallet.account.address;
           console.log('[TipJar] 👛 Wallet Connected:', state.tonAddress);
           
-          // AUTO-PAYMENT LOGIC:
-          // If the user is on the payment screen (Step 6), trigger the transaction immediately
+          // Note: We DO NOT auto-trigger handleTonPayment() here anymore.
+          // Mobile browsers (iOS/Android) block deep links that open wallet apps 
+          // if they are fired from an async background event like onStatusChange.
+          // The user MUST tap 'Confirm Payment' to generate the trusted tap event.
           if (state.currentStep === 6) {
-            console.log('[TipJar] ⚡ Auto-triggering transaction signature...');
-            App.handleTonPayment();
+            nextStep(6); // Refresh UI to show Confirm button
           }
         } else {
           state.tonAddress = null;
@@ -351,9 +352,11 @@ window.nextStep = async (step) => {
       if (headerTitle) headerTitle.innerText = 'Confirm Payment';
       if (headerText) headerText.innerText = 'Wallet linked! Tap confirm to sign the transaction.';
 
-      // AUTO-TRIGGER
-      console.log('[TipJar] ⚡ Already connected. Auto-triggering...');
-      setTimeout(() => App.handleTonPayment(), 500);
+      // AUTO-TRIGGER (Synchronous)
+      // Since this block is reached via a physical tap from Step 5 ("Proceed to Checkout"),
+      // we can synchronously trigger the payment without getting blocked.
+      console.log('[TipJar] ⚡ Already connected. Auto-triggering synchronously...');
+      App.handleTonPayment();
     } else {
       if (sendTxBtn) {
         sendTxBtn.style.display = 'none';
