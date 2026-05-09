@@ -107,12 +107,15 @@ const App = {
           state.tonAddress = wallet.account.address;
           console.log('[TipJar] 👛 Wallet Connected:', state.tonAddress);
           
-          // Note: We DO NOT auto-trigger handleTonPayment() here anymore.
-          // Mobile browsers (iOS/Android) block deep links that open wallet apps 
-          // if they are fired from an async background event like onStatusChange.
-          // The user MUST tap 'Confirm Payment' to generate the trusted tap event.
+          // If the user is on the payment screen, refresh the UI and trigger payment now.
+          // This is safe because the user just completed a wallet connect action.
           if (state.currentStep === 6) {
             nextStep(6); // Refresh UI to show Confirm button
+            setTimeout(() => {
+              if (tonConnectUI?.connected) {
+                App.handleTonPayment();
+              }
+            }, 100);
           }
         } else {
           state.tonAddress = null;
@@ -1400,7 +1403,7 @@ const updateDynamicUI = async () => {
   }
 
   // Fetch real analytics and history if viewing as creator
-  let todayTotal = 0, weekTotal = 0, allTotal = state.balance;
+  let todayTotal = 0, weekTotal = 0, monthTotal = 0, allTotal = state.balance, supporterCount = 0;
   
   const targetId = state.selectedCreatorId || (dbCreator ? dbCreator.id : null);
   
@@ -1411,6 +1414,8 @@ const updateDynamicUI = async () => {
         const metrics = await getAnalyticsMetrics(dbCreator.id);
         todayTotal = metrics.today;
         weekTotal = metrics.week;
+        monthTotal = metrics.month;
+        supporterCount = metrics.count;
         allTotal = metrics.total;
         state.balance = allTotal; 
         state.goal.current = allTotal;
@@ -1493,6 +1498,11 @@ const updateDynamicUI = async () => {
   if (statToday)   statToday.innerText   = `$${todayTotal.toFixed(0)}`;
   if (statWeek)    statWeek.innerText    = `$${weekTotal.toFixed(0)}`;
   if (statAlltime) statAlltime.innerText = `$${allTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}`;
+
+  const monthTipsEl = document.getElementById('dashboard-monthly-tips');
+  const supportersEl = document.getElementById('dashboard-total-supporters');
+  if (monthTipsEl) monthTipsEl.innerText = `$${monthTotal.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}`;
+  if (supportersEl) supportersEl.innerText = supporterCount.toLocaleString();
 
   const currentBalanceDisplays = document.querySelectorAll('.current-balance');
   currentBalanceDisplays.forEach(el => el.innerText = `$${allTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
