@@ -32,13 +32,16 @@ html, body {
 
 body {
   font-family: var(--font-main);
-  background-color: white; /* Default to white for seamless mobile look */
+  background-color: white;
   color: var(--text-main);
   line-height: 1.5;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100%;
+  height: 100%;
+  width: 100%;
+  overflow: hidden; /* Body MUST NOT scroll */
+  position: fixed; /* Lock body position */
 }
 
 /* Desktop Only Background */
@@ -51,15 +54,12 @@ body {
 #app {
   width: 100%;
   max-width: 480px;
-  height: 92vh; /* Slight gap on desktop for premium look */
-  max-height: 900px;
+  height: 100%; /* Fill the fixed body exactly */
   background-color: white;
   position: relative;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 50px 100px -20px rgba(0,0,0,0.2);
-  border-radius: 40px;
-  overflow: hidden;
+  overflow: hidden; /* Only children scroll */
 }
 
 @media (max-width: 600px) {
@@ -76,13 +76,18 @@ body {
 }
 
 .screen {
-  flex: 1;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
-  padding: 40px 32px 140px; /* Increased padding to clear bottom nav */
+  padding: 40px 32px 180px; /* Massive padding to clear bottom nav */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  transition: var(--transition);
+  transition: opacity 0.3s ease;
+  background: white;
 }
 
 .screen::-webkit-scrollbar { display: none; }
@@ -1622,19 +1627,18 @@ h1 {
 .bottom-nav {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.95);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid rgba(0,0,0,0.05);
   display: flex;
   justify-content: space-around;
-  padding: 12px 0 32px 0;
-  z-index: 2000;
-  box-shadow: 0 -10px 40px rgba(0,0,0,0.03);
-  max-width: 480px;
-  margin: 0 auto;
+  padding: 12px 0 34px 0; /* Clear safe area */
+  z-index: 9999; /* Always on top */
 }
 
 .nav-item {
