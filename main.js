@@ -576,6 +576,13 @@ window.nextStep = async (step) => {
 
     transitionScreen(currentScreen, nextScreen);
     state.currentStep = step;
+
+    // Update Bottom Nav Active State
+    document.querySelectorAll('.nav-item').forEach((item, idx) => {
+      const steps = [7, 8, 4, 9];
+      item.classList.toggle('active', steps[idx] === step);
+    });
+
     triggerHaptic('light');
     return;
   }
@@ -609,6 +616,13 @@ window.nextStep = async (step) => {
   }
   
   state.currentStep = step;
+
+  // Update Bottom Nav Active State
+  document.querySelectorAll('.nav-item').forEach((item, idx) => {
+    // Indices based on HTML order: 0: Home(7), 1: Supporters(8), 2: Public(4), 3: Settings(9)
+    const steps = [7, 8, 4, 9];
+    item.classList.toggle('active', steps[idx] === step);
+  });
 };
 
 const startOnboardingTimer = (step) => {
