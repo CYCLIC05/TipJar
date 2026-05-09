@@ -576,6 +576,7 @@ window.nextStep = async (step) => {
 
     transitionScreen(currentScreen, nextScreen);
     state.currentStep = step;
+    triggerHaptic('light');
     return;
   }
 
@@ -676,6 +677,7 @@ window.selectTip = (amount) => {
   state.customAmount = '';
   document.getElementById('custom-amount').value = '';
   updateTipUI();
+  triggerHaptic('light');
 };
 
 window.handleCustomAmount = (val) => {
@@ -1402,12 +1404,26 @@ const updateDynamicUI = async () => {
     if (window.animateGoal) window.animateGoal();
   }
 
+  // Show skeletons if we are loading fresh data
+  const profileSkeleton = document.getElementById('profile-skeleton');
+  const profileContent = document.getElementById('profile-content');
+  const dashSkeleton = document.getElementById('dashboard-skeleton');
+  const dashContent = document.getElementById('dashboard-content');
+
+  const showSkeletons = (loading) => {
+    if (profileSkeleton) profileSkeleton.style.display = loading ? 'block' : 'none';
+    if (profileContent) profileContent.style.display = loading ? 'none' : 'block';
+    if (dashSkeleton) dashSkeleton.style.display = loading ? 'block' : 'none';
+    if (dashContent) dashContent.style.display = loading ? 'none' : 'block';
+  };
+
   // Fetch real analytics and history if viewing as creator
   let todayTotal = 0, weekTotal = 0, monthTotal = 0, allTotal = state.balance, supporterCount = 0;
   
   const targetId = state.selectedCreatorId || (dbCreator ? dbCreator.id : null);
   
   if (targetId) {
+    showSkeletons(true);
     try {
       // If we are the owner, get full analytics
       if (dbCreator && targetId === dbCreator.id) {
@@ -1431,6 +1447,8 @@ const updateDynamicUI = async () => {
       }));
     } catch (e) {
       console.warn('[TipJar] Could not load metrics/tips:', e);
+    } finally {
+      showSkeletons(false);
     }
   }
 
@@ -1685,17 +1703,38 @@ const showLoadingOverlay = (show, message = 'Processing...') => {
   overlay.classList.toggle('visible', show);
 };
 
-const showToast = (message) => {
+const showToast = (message, type = 'info') => {
   const toast = document.createElement('div');
-  toast.className = 'toast';
+  toast.className = `toast ${type}`;
   toast.innerText = message;
   document.body.appendChild(toast);
+  
+  // Haptic feedback for notifications
+  if (type === 'error') triggerHaptic('error');
+  else if (type === 'success') triggerHaptic('success');
+  
   setTimeout(() => toast.classList.add('visible'), 100);
   setTimeout(() => {
     toast.classList.remove('visible');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 };
+
+/** Native Telegram Haptic Feedback */
+const triggerHaptic = (type = 'light') => {
+  if (window.Telegram?.WebApp?.HapticFeedback) {
+    const haptic = window.Telegram.WebApp.HapticFeedback;
+    switch(type) {
+      case 'light': haptic.impactOccurred('light'); break;
+      case 'medium': haptic.impactOccurred('medium'); break;
+      case 'success': haptic.notificationOccurred('success'); break;
+      case 'error': haptic.notificationOccurred('error'); break;
+      case 'warning': haptic.notificationOccurred('warning'); break;
+      default: haptic.impactOccurred('light');
+    }
+  }
+};
+window.triggerHaptic = triggerHaptic;
 
 // Export to window for inline onclick handlers
 window.showToast = showToast;
@@ -1746,6 +1785,8 @@ window.showFirstTipCelebration = (amount, currency, tipperName) => {
   const confettiEl = document.getElementById('first-tip-confetti');
 
   if (!overlay) return;
+
+  triggerHaptic('success');
 
   if (amountEl) amountEl.innerText = `+$${parseFloat(amount).toFixed(2)}`;
   if (fromEl)   fromEl.innerText   = tipperName ? `Tipped by ${tipperName} 💜` : 'Your first supporter 💜';

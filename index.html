@@ -86,7 +86,12 @@
           <i data-lucide="arrow-left" style="width: 20px; height: 20px; color: #111827;"></i>
         </button>
       </div>
-      <div class="profile-header">
+      <div class="profile-header" id="profile-skeleton" style="display: none;">
+        <div class="skeleton skeleton-avatar" style="margin: 0 auto 16px;"></div>
+        <div class="skeleton skeleton-text" style="width: 140px; margin: 0 auto 12px;"></div>
+        <div class="skeleton skeleton-text" style="width: 100px; margin: 0 auto 20px;"></div>
+      </div>
+      <div class="profile-header" id="profile-content">
         <div style="position: relative; display: inline-block;">
           <img src="" alt="Alex Rivers" class="avatar-large" id="alex-avatar">
           <div id="tipper-premium-badge" class="premium-badge" style="display: none;">
@@ -123,6 +128,12 @@
             <div style="font-size: 10px; color: #9CA3AF; font-weight: 600;">Be the first!</div>
           </div>
         </div>
+      </div>
+
+      <!-- Support Call to Action -->
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h3 style="font-size: 18px; font-weight: 900; color: #111827;">Support <span class="alex-name">Alex</span></h3>
+        <p style="font-size: 12px; color: #6B7280; font-weight: 600;">Choose an amount to tip below</p>
       </div>
 
       <div class="tip-options">
@@ -308,7 +319,23 @@
     <!-- Step 7: Creator Dashboard -->
     <div id="step-7" class="screen hidden" style="padding-bottom: 90px; background: #FFFFFF;">
     <!-- Ticker removed -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+      <div id="dashboard-skeleton" style="display: none;">
+        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+          <div class="skeleton skeleton-avatar"></div>
+          <div style="flex: 1;">
+            <div class="skeleton skeleton-text" style="width: 120px;"></div>
+            <div class="skeleton skeleton-text" style="width: 60px;"></div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+           <div class="skeleton skeleton-card" style="flex: 1;"></div>
+           <div class="skeleton skeleton-card" style="flex: 1;"></div>
+           <div class="skeleton skeleton-card" style="flex: 1;"></div>
+        </div>
+        <div class="skeleton skeleton-card" style="height: 140px; margin-bottom: 24px;"></div>
+      </div>
+      <div id="dashboard-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
         <div style="display: flex; align-items: center; gap: 12px;">
           <div style="position: relative;">
             <img id="dashboard-avatar" src="https://api.dicebear.com/7.x/adventurer/svg?seed=Alex" alt="" style="width: 48px; height: 48px; border-radius: 50%; border: 2px solid white; box-shadow: var(--shadow);">
@@ -430,13 +457,14 @@
           <span style="font-size: 10px; font-weight: 700;">Supporters</span>
         </div>
         <div onclick="nextStep(4)" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9CA3AF; cursor: pointer;">
-          <i data-lucide="user" style="width: 24px; height: 24px;"></i>
-          <span style="font-size: 10px; font-weight: 700;">Profile</span>
+          <i data-lucide="external-link" style="width: 24px; height: 24px;"></i>
+          <span style="font-size: 10px; font-weight: 700;">Public Page</span>
         </div>
         <div onclick="nextStep(9)" style="display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9CA3AF; cursor: pointer;">
           <i data-lucide="settings" style="width: 24px; height: 24px;"></i>
           <span style="font-size: 10px; font-weight: 700;">Settings</span>
         </div>
+      </div>
       </div>
     </div>
 
