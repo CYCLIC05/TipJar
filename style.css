@@ -1569,3 +1569,16 @@ h1 {
   from { transform: translateY(30px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+@media (max-width: 480px) {
+  .withdraw-card-orange {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+    padding: 24px 20px;
+  }
+  .withdraw-btn-dark {
+    width: 100%;
+    padding: 14px 20px;
+  }
+}

@@ -1,2 +1,2 @@
 # Procfile for Railway
-web: node bot.js
+web: python main.py

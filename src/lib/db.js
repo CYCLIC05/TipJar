@@ -51,8 +51,48 @@ export async function getCreatorTips(creatorId, limit = 20) {
   return data ?? [];
 }
 
-/** Create a new PENDING tip record before the payment is made */
-export async function createTipRecord({ creatorId, tipperName, message, currency, cryptoAmount, usdValue, invoiceId, payUrl }) {
+/** Subscribe to live global tips for the activity feed */
+export function subscribeToPublicTips(callback) {
+  return supabase
+    .channel('public-tips')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tips', filter: "status=eq.COMPLETED" }, payload => {
+      callback(payload.new);
+    })
+    .subscribe();
+}
+
+/** Fetch aggregated analytics (Today, Week, Month) for a creator */
+export async function getAnalyticsMetrics(creatorId) {
+  const { data, error } = await supabase
+    .from('tips')
+    .select('usd_value, paid_at')
+    .eq('creator_id', creatorId)
+    .eq('status', 'COMPLETED');
+    
+  if (error) throw error;
+  
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  
+  let today = 0, week = 0, month = 0, total = 0;
+  
+  (data || []).forEach(tip => {
+    const amt = tip.usd_value || 0;
+    const date = new Date(tip.paid_at);
+    
+    total += amt;
+    if (date >= todayStart) today += amt;
+    if (date >= weekStart) week += amt;
+    if (date >= monthStart) month += amt;
+  });
+  
+  return { today, week, month, total, count: data ? data.length : 0 };
+}
+
+/** Create a new PENDING or COMPLETED tip record */
+export async function createTipRecord({ creatorId, tipperName, message, currency, cryptoAmount, usdValue, invoiceId, payUrl, status = 'PENDING' }) {
   const { data, error } = await supabase
     .from('tips')
     .insert({
@@ -64,7 +104,8 @@ export async function createTipRecord({ creatorId, tipperName, message, currency
       usd_value: usdValue,
       invoice_id: invoiceId,
       pay_url: payUrl,
-      status: 'PENDING',
+      status: status,
+      paid_at: status === 'COMPLETED' ? new Date().toISOString() : null,
     })
     .select()
     .single();

@@ -1,8 +1,10 @@
 // TipJar — Main App Entry Point
+import './polyfills.js';
 import { supabase } from './src/lib/supabase.js';
 import { initTelegramAuth } from './src/lib/auth.js';
-import { getCreatorTips, createTipRecord, updateCreator } from './src/lib/db.js';
+import { getCreatorTips, createTipRecord, updateCreator, subscribeToPublicTips, getAnalyticsMetrics, requestWithdrawal } from './src/lib/db.js';
 import { TonConnectUI } from '@tonconnect/ui';
+import { beginCell } from '@ton/core';
 
 // The authenticated creator record from Supabase (populated on load)
 let dbCreator = null;
@@ -16,11 +18,8 @@ const state = {
   customAmount: '',
   selectedMethod: 'usdt',
   balance: 2450.12,
-  notifications: [
-    { id: 1, text: 'New tip from @crypto_king: $120.00', time: '2m ago', type: 'tip' },
-    { id: 2, text: 'Withdrawal of $500.00 processed', time: '1h ago', type: 'payout' },
-    { id: 3, text: 'Welcome to TipJar! Your channel is live.', time: '1d ago', type: 'system' }
-  ],
+  notifications: [], // Will be populated from Supabase
+  liveFeed: [], // Public live feed
   creator: {
     name: 'Alex Rivers',
     handle: '@alex_creates',
@@ -35,13 +34,17 @@ const state = {
     wheel: 100
   },
   thankYouMessage: "Thanks for the support! It means the world to me. Keep being awesome!",
+  selectedMessage: '',
   walletAddress: "0x71C...39A2",
   tonAddress: null,
   goal: {
     title: 'New Studio Camera 🎥',
     current: 2450.12,
     target: 3000
-  }
+  },
+  liveSimTimer: null,
+  chatId: null, // Stores the Telegram chat ID if tipped from a group
+  userRole: 'VIEWER' // 'OWNER' or 'VIEWER'
 };
 
 // --- App Controller ---
@@ -49,18 +52,47 @@ const App = {
   init() {
     this.bindEvents();
     this.initTonConnect();
-    this.render();
+    this.initRealtimeFeed();
     if (window.lucide) window.lucide.createIcons();
-    startOnboardingTimer(1);
+  },
+
+  initRealtimeFeed() {
+    subscribeToPublicTips((newTip) => {
+      // Add to live feed state
+      const amt = parseFloat(newTip.usd_value).toFixed(2);
+      const name = newTip.tipper_name || 'Someone';
+      const toastText = `🔥 ${name} tipped $${amt}`;
+      
+      // Update state and UI
+      state.liveFeed.unshift({ text: toastText, id: newTip.id });
+      if (state.liveFeed.length > 50) state.liveFeed.pop();
+      
+      // Show toast to active viewers
+      showToast(toastText);
+      
+      // If it's a tip to the current creator, update notifications and balance if not already done locally
+      if (dbCreator && newTip.creator_id === dbCreator.id) {
+        // Refresh analytics
+        updateDynamicUI();
+      }
+    });
   },
 
   initTonConnect() {
     try {
-      const manifestPath = `${window.location.origin}/tonconnect-manifest.json`;
+      const basePath = import.meta.env.BASE_URL || '/';
+      const manifestPath = new URL('tonconnect-manifest.json', `${window.location.origin}${basePath}`).href;
       console.log('[TipJar] 📦 Initializing TON Connect with manifest:', manifestPath);
+      window.TipJarTonConnectManifestUrl = manifestPath;
+      window.TipJarTonConnectDebug = {
+        origin: window.location.origin,
+        basePath,
+        manifestPath,
+        envBaseUrl: import.meta.env.BASE_URL
+      };
 
       tonConnectUI = new TonConnectUI({
-        manifestUrl: manifestPath, 
+        manifestUrl: manifestPath,
         buttonRootId: 'ton-connect-wrapper'
       });
 
@@ -97,10 +129,15 @@ const App = {
     const sendTxBtn = document.getElementById('send-tx-btn');
     const doneBtn = document.getElementById('receipt-done-btn');
     const connectWrapper = document.getElementById('ton-connect-wrapper');
+    const txIdEl = document.getElementById('receipt-tx-id');
 
     try {
       const MERCHANT_ADDRESS = 'UQDwT-v0d7vO-u6nO7wA99N61v0p5wzP-5p8V4O0x_1W6fHj';
-      showLoadingOverlay(true, 'Waiting for wallet signature...');
+      
+      // 1. Update UI to PENDING
+      if (statusEl) { statusEl.innerText = 'PROCESSING...'; statusEl.style.color = '#F79F1A'; }
+      if (txIdEl) txIdEl.innerText = 'Calculating TON amount...';
+      showLoadingOverlay(true, 'Calculating payment...');
       
       if (sendTxBtn) {
         sendTxBtn.innerHTML = 'Processing... <div class="spinner-custom" style="width: 18px; height: 18px; border-width: 2px;"></div>';
@@ -110,31 +147,70 @@ const App = {
 
       if (!tonConnectUI.connected) {
         showLoadingOverlay(false);
-        showToast('Please connect your wallet first!');
-        nextStep(6); // Reset to connect state
+        showToast('Please connect your wallet first.');
+        nextStep(6);
         return;
       }
 
+      // 2. Fetch live TON/USD price
+      let tonPriceUsd = 2.50; // Fallback price
+      try {
+        const priceRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=the-open-network&vs_currencies=usd');
+        const priceData = await priceRes.json();
+        if (priceData['the-open-network']?.usd) {
+          tonPriceUsd = priceData['the-open-network'].usd;
+        }
+        console.log('[TipJar] TON Price:', tonPriceUsd);
+      } catch (priceErr) {
+        console.warn('[TipJar] Could not fetch TON price, using fallback $' + tonPriceUsd);
+      }
+
+      // 3. Calculate correct TON amount (in nanoTON: 1 TON = 1,000,000,000 nanoTON)
+      const usdAmount = state.selectedAmount;
+      const tonAmount = usdAmount / tonPriceUsd;
+      const nanoTonAmount = Math.ceil(tonAmount * 1_000_000_000).toString();
+      
+      console.log(`[TipJar] Tip: $${usdAmount} = ${tonAmount.toFixed(4)} TON (${nanoTonAmount} nanoTON)`);
+      if (txIdEl) txIdEl.innerText = `Sending ${tonAmount.toFixed(4)} TON (~$${usdAmount.toFixed(2)})...`;
+
+      // Build the comment payload
+      const tipper = state.tipperName || 'Supporter';
+      const comment = `TipJar Support from ${tipper}`;
+      const payloadCell = beginCell().storeUint(0, 32).storeStringTail(comment).endCell();
+      const payloadBoc = payloadCell.toBoc().toString('base64');
+
+      // 4. Build and send the transaction
+      showLoadingOverlay(true, 'Waiting for wallet signature...');
+
       const transaction = {
-        validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutes
+        validUntil: Math.floor(Date.now() / 1000) + 600,
         messages: [
           {
             address: MERCHANT_ADDRESS,
-            amount: "50000000", // 0.05 TON
+            amount: nanoTonAmount,
+            payload: payloadBoc
           }
         ]
       };
 
-      console.log('[TipJar] 🚀 Sending Transaction:', transaction);
+      console.log('[TipJar] Sending Transaction:', transaction);
       const result = await tonConnectUI.sendTransaction(transaction);
-      console.log('[TipJar] ✅ TON Payment Success:', result);
+      console.log('[TipJar] TON Payment Success:', result);
       
       showLoadingOverlay(false);
+
+      // 5. Update Receipt to SUCCESS
+      const txHash = result.boc || `TON_${Date.now()}`;
+      if (statusEl) { statusEl.innerText = 'CONFIRMED'; statusEl.style.color = '#10B981'; }
+      if (txIdEl) txIdEl.innerText = txHash;
+      if (doneBtn) doneBtn.style.display = 'block';
+      if (sendTxBtn) sendTxBtn.style.display = 'none';
+      if (connectWrapper) connectWrapper.style.display = 'none';
       
       // Update Success Screen Info
       const successAmountEl = document.getElementById('success-amount');
       const successCreatorEl = document.getElementById('success-creator-name');
-      if (successAmountEl) successAmountEl.innerText = state.selectedAmount.toFixed(2);
+      if (successAmountEl) successAmountEl.innerText = usdAmount.toFixed(2);
       if (successCreatorEl) successCreatorEl.innerText = state.creator.name;
 
       // Show Confetti and Go to Success Screen
@@ -142,26 +218,58 @@ const App = {
       nextStep(13);
       App.playLottie('lottie-container-success', '/coin-jar.json'); 
       
-      state.balance += state.selectedAmount;
+      // Play Success Sound
+      const sound = document.getElementById('success-sound');
+      if (sound) {
+        sound.volume = 0.5;
+        sound.play().catch(e => console.log('Audio autoplay prevented', e));
+      } 
+      
+      state.balance += usdAmount;
       updateDynamicUI();
 
-      // Record in DB for the target creator
+      // 6. Record in DB
       const targetId = state.selectedCreatorId || (dbCreator ? dbCreator.id : null);
       if (targetId) {
-        await createTipRecord({
-          creatorId: targetId,
-          tipperName: state.tipperName || 'Supporter',
-          amountUsd: state.selectedAmount,
-          message: state.selectedMessage || '',
-          currency: 'TON',
-          txId: result.boc || 'TON_TRANSFER'
-        });
+        try {
+          const tipRecord = await createTipRecord({
+            creatorId: targetId,
+            tipperName: state.tipperName || 'Supporter',
+            message: state.selectedMessage || '',
+            currency: 'TON',
+            cryptoAmount: tonAmount,
+            usdValue: usdAmount,
+            invoiceId: txHash,
+            payUrl: '',
+            status: 'COMPLETED'
+          });
+
+          // Ping the Telegram Bot so it can announce the tip and check milestones
+          const botApiUrl = import.meta.env.VITE_BOT_API_URL || 'https://tipjar-production.up.railway.app';
+          try {
+            await fetch(`${botApiUrl}/api/notify_tip`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tip_id: tipRecord.id,
+                chat_id: state.chatId
+              })
+            });
+            console.log('[TipJar] Bot notified successfully');
+          } catch (apiErr) {
+            console.warn('[TipJar] Could not ping bot API:', apiErr.message);
+          }
+        } catch (dbErr) {
+          console.warn('[TipJar] Could not save tip to DB:', dbErr.message);
+        }
       }
     } catch (err) {
       showLoadingOverlay(false);
-      console.error('[TipJar] ❌ Payment Error:', err);
+      console.error('[TipJar] Payment Error:', err);
       
-      if (statusEl) { statusEl.innerText = 'PAYMENT FAILED'; statusEl.style.color = '#EF4444'; }
+      // Update Receipt to FAILED
+      if (statusEl) { statusEl.innerText = 'FAILED'; statusEl.style.color = '#EF4444'; }
+      if (txIdEl) txIdEl.innerText = err.message || 'Transaction was rejected or timed out.';
       
       // Restore button for retry
       if (sendTxBtn) {
@@ -174,7 +282,7 @@ const App = {
       // Update header to guide user
       const headerTitle = document.querySelector('#awaiting-header h1');
       const headerText = document.querySelector('#awaiting-header p');
-      if (headerTitle) headerTitle.innerText = 'Payment Canceled';
+      if (headerTitle) headerTitle.innerText = 'Payment Failed';
       if (headerText) headerText.innerText = 'The transaction was rejected. You can try again below.';
 
       showToast('Payment rejected or timed out.');
@@ -201,6 +309,7 @@ const App = {
         .from('tips')
         .select('*')
         .eq('creator_id', creatorId)
+        .eq('status', 'COMPLETED')
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -217,6 +326,7 @@ const App = {
             <div style="font-size: 10px; color: #9CA3AF; font-weight: 600;">Be the first!</div>
           </div>
         `;
+        if (countEl) countEl.innerText = `0 Tippers`;
         if (window.lucide) window.lucide.createIcons();
         return;
       }
@@ -231,10 +341,58 @@ const App = {
             </div>
           </div>
           ${tip.message ? `<div style="font-size: 11px; color: #6B7280; line-height: 1.4; font-style: italic; background: #F9FAFB; padding: 8px 12px; border-radius: 14px;">"${tip.message}"</div>` : ''}
+          <button onclick="window.selectTip(${tip.amount_usd}); document.getElementById('step-4').scrollIntoView({behavior: 'smooth'})" style="width: 100%; padding: 6px; background: #F9FAFB; color: #111827; border: 1px solid #E5E7EB; border-radius: 10px; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 4px;"><i data-lucide="plus" style="width: 12px; height: 12px;"></i> Match</button>
         </div>
       `).join('');
     } catch (err) {
       console.warn('[TipJar] Error loading supporters:', err);
+    }
+  },
+
+  async loadTopSupporters() {
+    const list = document.getElementById('supporters-list');
+    if (!list) return;
+
+    const creatorId = state.selectedCreatorId || (dbCreator ? dbCreator.id : null);
+    if (!creatorId) {
+      list.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #6B7280;">Select a creator to see top supporters.</div>`;
+      return;
+    }
+
+    try {
+      const { data: tips, error } = await supabase
+        .from('tips')
+        .select('id, tipper_name, usd_value, paid_at, message')
+        .eq('creator_id', creatorId)
+        .eq('status', 'COMPLETED')
+        .order('usd_value', { ascending: false })
+        .limit(12);
+
+      if (error) throw error;
+
+      if (!tips || tips.length === 0) {
+        list.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #6B7280;">No supporters yet. Share your link and get your first tip!</div>`;
+        return;
+      }
+
+      list.innerHTML = tips.map((tip, idx) => `
+        <div class="method-card" style="padding: 18px; border-radius: 20px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <div style="width: 42px; height: 42px; border-radius: 50%; background: #F3F4F6; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #111827;">${idx + 1}</div>
+            <div>
+              <div style="font-weight: 700; color: #111827;">${tip.tipper_name || 'Supporter'}</div>
+              <div style="font-size: 11px; color: #6B7280;">${tip.paid_at ? new Date(tip.paid_at).toLocaleDateString() : 'Just now'}</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 800; color: #10B981;">+$${parseFloat(tip.usd_value || 0).toFixed(2)}</div>
+            ${tip.message ? `<div style="font-size: 11px; color: #6B7280; margin-top: 4px;">"${tip.message.length > 40 ? tip.message.slice(0, 40) + '...' : tip.message}"</div>` : ''}
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      console.warn('[TipJar] Error loading top supporters:', err);
+      list.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: #EF4444;">Unable to load supporters right now.</div>`;
     }
   },
 
@@ -264,14 +422,44 @@ const App = {
   },
 
   render() {
+    // Show correct screen
+    const screens = document.querySelectorAll('.screen');
+    screens.forEach(s => {
+      s.classList.add('hidden');
+      s.style.opacity = '0';
+      s.style.transform = 'translateY(10px)';
+    });
+
+    const activeScreen = document.getElementById(`step-${state.currentStep}`);
+    if (activeScreen) {
+      activeScreen.classList.remove('hidden');
+      activeScreen.style.opacity = '1';
+      activeScreen.style.transform = 'translateY(0)';
+      
+      // Update icons for the newly shown screen
+      if (window.lucide) window.lucide.createIcons();
+    }
+
     updateDynamicUI();
   }
 };
 window.nextStep = async (step) => {
-  const currentScreen = document.querySelector('.screen:not(.hidden)');
+  if (step === state.currentStep) return;
+
+  const currentScreen = document.getElementById(`step-${state.currentStep}`);
   const nextScreen = document.getElementById(`step-${step}`);
   
   if (!nextScreen) return;
+
+  // Route Guarding: Viewers cannot access creator-only screens
+  const creatorOnlySteps = [7, 8, 9, 10, 11, 12];
+  if (state.userRole === 'VIEWER' && creatorOnlySteps.includes(step)) {
+    console.warn(`[TipJar] Blocked access to step ${step} for VIEWER role.`);
+    return;
+  }
+
+  // Update state
+  state.currentStep = step;
 
   // Clear any existing onboarding timer
   if (state.onboardingTimer) {
@@ -279,21 +467,32 @@ window.nextStep = async (step) => {
     state.onboardingTimer = null;
   }
 
-  // If authenticated as a creator, skip onboarding steps 1-3 and go straight to dashboard.
-  // We allow step 4, 5, 6 (tipping flow) so they can preview their profile.
+  // If authenticated as a creator, skip onboarding steps 1-3
   if (dbCreator && step > 1 && step < 4) {
-    const dashboardScreen = document.getElementById('step-7');
-    if (dashboardScreen) {
-      transitionScreen(currentScreen, dashboardScreen);
-      state.currentStep = 7;
-      updateDynamicUI();
-      return;
-    }
+    state.currentStep = 7;
   }
+
+  transitionScreen(currentScreen, document.getElementById(`step-${state.currentStep}`));
 
   // Step 4 — Load Recent Supporters for the Wall
   if (step === 4) {
     App.loadRecentSupporters();
+    
+    // Start Simulated Live Activity
+    if (state.liveSimTimer) clearInterval(state.liveSimTimer);
+    state.liveSimTimer = setInterval(() => {
+      const viewers = Math.floor(Math.random() * 8) + 2;
+      if (window.showToast) window.showToast(`👀 ${viewers} people are viewing this profile right now`);
+    }, 15000); // Every 15s show toast
+  } else {
+    if (state.liveSimTimer) {
+      clearInterval(state.liveSimTimer);
+      state.liveSimTimer = null;
+    }
+  }
+
+  if (step === 8) {
+    App.loadTopSupporters();
   }
 
   // Step 6 — Payment Logic (TON Wallet Exclusive)
@@ -383,6 +582,11 @@ window.nextStep = async (step) => {
   } else {
     transitionScreen(currentScreen, nextScreen);
     
+    // Populate Settings share link dynamically
+    if (step === 9 && window.updateSettingsShareLink) {
+      window.updateSettingsShareLink();
+    }
+
     // Auto-advance logic for onboarding (Steps 1, 2, 3)
     if (step < 4) {
       if (step === 1) App.playLottie('lottie-container-welcome', '/coin-jar.json');
@@ -533,21 +737,41 @@ window.saveGoal = () => {
 };
 
 window.confirmWithdraw = async () => {
+  if (state.balance < 10) {
+    showToast('Minimum withdrawal is $10.00');
+    closeModal(null, 'withdraw-modal');
+    return;
+  }
+
   if (!state.walletAddress || state.walletAddress === '0x71C...39A2') {
     closeModal(null, 'withdraw-modal');
-    showToast('⚠️ Please set a payout wallet in Settings first!');
+    showToast('Please set a payout wallet in Settings first.');
     nextStep(9);
     return;
   }
   const modal = document.getElementById('withdraw-modal');
   if (modal) modal.classList.remove('visible');
   showLoadingOverlay(true, 'Submitting withdrawal request...');
-  setTimeout(() => {
+
+  try {
+    const creatorId = dbCreator?.id;
+    if (creatorId) {
+      const { requestWithdrawal } = await import('./src/lib/db.js');
+      await requestWithdrawal(creatorId, {
+        grossAmount: state.balance,
+        wallet: state.walletAddress,
+        currency: 'TON'
+      });
+    }
     state.balance = 0;
     showLoadingOverlay(false);
     showToast('Withdrawal request submitted! Funds will be sent shortly.');
     updateDynamicUI();
-  }, 2000);
+  } catch (err) {
+    console.error('[TipJar] Withdrawal error:', err);
+    showLoadingOverlay(false);
+    showToast('Withdrawal failed. Please try again.');
+  }
 };
 
 window.savePayoutWallet = async () => {
@@ -645,14 +869,37 @@ window.changeWallet = () => {
   }
 };
 
-window.connectTON = () => {
-  showLoadingOverlay(true, "Connecting to TON Wallet...");
-  setTimeout(() => {
-    state.tonAddress = "EQD4...k8hZ"; // Mocked TON address
+window.connectTON = async () => {
+  if (!tonConnectUI) {
+    showToast('TON Connect not initialized yet.');
+    return;
+  }
+
+  if (tonConnectUI.connected) {
+    showToast('Wallet already connected.');
+    return;
+  }
+
+  showLoadingOverlay(true, 'Opening TON wallet...');
+  try {
+    if (typeof tonConnectUI.connect === 'function') {
+      await tonConnectUI.connect();
+    } else if (typeof tonConnectUI.connectWallet === 'function') {
+      await tonConnectUI.connectWallet();
+    } else if (typeof tonConnectUI.requestConnection === 'function') {
+      await tonConnectUI.requestConnection();
+    } else {
+      throw new Error('TON Connect API not available');
+    }
+
     showLoadingOverlay(false);
-    showToast("TON Wallet connected!");
+    showToast('TON Wallet connected!');
     updateDynamicUI();
-  }, 1500);
+  } catch (err) {
+    showLoadingOverlay(false);
+    console.warn('[TipJar] TON connect failed:', err);
+    showToast('Unable to connect TON wallet. Please try again.');
+  }
 };
 
 // --- Scratch Card Logic ---
@@ -1088,10 +1335,11 @@ const updateTipUI = () => {
   }
 };
 
-const updateDynamicUI = () => {
+const updateDynamicUI = async () => {
+  if (!state.creator) return;
   // Update avatars and names dynamically
-  document.querySelectorAll('.alex-name').forEach(el => el.innerText = state.creator.name);
-  document.querySelectorAll('.alex-handle').forEach(el => el.innerText = state.creator.handle);
+  document.querySelectorAll('.alex-name').forEach(el => el.innerText = state.creator.name || 'Creator');
+  document.querySelectorAll('.alex-handle').forEach(el => el.innerText = state.creator.handle || '@creator');
   const receiptAvatar = document.getElementById('receipt-avatar');
   if (receiptAvatar) receiptAvatar.src = state.creator.avatar;
   
@@ -1101,8 +1349,8 @@ const updateDynamicUI = () => {
   const receiptMsgContainer = document.getElementById('receipt-message-container');
   const receiptMsgText = document.getElementById('receipt-message-text');
   if (receiptMsgContainer && receiptMsgText) {
-    if (state.tipMessage && state.tipMessage.trim() !== '') {
-      receiptMsgText.innerText = `"${state.tipMessage.trim()}"`;
+    if (state.selectedMessage && state.selectedMessage.trim() !== '') {
+      receiptMsgText.innerText = `"${state.selectedMessage.trim()}"`;
       receiptMsgContainer.style.display = 'block';
     } else {
       receiptMsgContainer.style.display = 'none';
@@ -1130,7 +1378,6 @@ const updateDynamicUI = () => {
   if (ticketDisplay) {
     ticketDisplay.innerText = state.tickets;
   }
-
   // Update Goal UI
   const goalTitle = document.getElementById('dashboard-goal-title');
   const goalCurrent = document.getElementById('dashboard-goal-current');
@@ -1149,7 +1396,29 @@ const updateDynamicUI = () => {
     if (window.animateGoal) window.animateGoal();
   }
 
-  // Update Notifications (Empty State Handling)
+  // Fetch real analytics and history if viewing as creator
+  let todayTotal = 0, weekTotal = 0, allTotal = state.balance;
+  if (dbCreator && state.selectedCreatorId === dbCreator.id) {
+    try {
+      const metrics = await getAnalyticsMetrics(dbCreator.id);
+      todayTotal = metrics.today;
+      weekTotal = metrics.week;
+      allTotal = metrics.total;
+      state.balance = allTotal; // sync local balance state
+      
+      const tips = await getCreatorTips(dbCreator.id, 20);
+      state.notifications = tips.map(t => ({
+        id: t.id,
+        text: `New tip from ${t.tipper_name || 'Supporter'}: $${(t.usd_value || 0).toFixed(2)}`,
+        time: t.paid_at ? new Date(t.paid_at).toLocaleDateString() : 'Just now',
+        type: 'tip'
+      }));
+    } catch (e) {
+      console.warn('[TipJar] Could not load metrics:', e);
+    }
+  }
+
+  // Update Notifications (Activity Feed)
   const notifyList = document.getElementById('notifications-list');
   if (notifyList) {
     if (state.notifications.length === 0) {
@@ -1167,7 +1436,7 @@ const updateDynamicUI = () => {
       notifyList.innerHTML = state.notifications.map(n => `
         <div class="supporter-item" style="border: none; background: #F9FAFB; padding: 16px; border-radius: 20px; margin-bottom: 12px;">
           <div style="display: flex; align-items: center; gap: 14px;">
-            <div class="action-icon" style="background: white;"><i data-lucide="${n.type === 'tip' ? 'heart' : n.type === 'payout' ? 'zap' : 'info'}" style="width: 18px; height: 18px;"></i></div>
+            <div class="action-icon" style="background: white;"><i data-lucide="${n.type === 'tip' ? 'heart' : n.type === 'payout' ? 'arrow-up-right' : 'info'}" style="width: 18px; height: 18px;"></i></div>
             <div>
               <div style="font-weight: 700; font-size: 14px;">${n.text}</div>
               <div style="font-size: 11px; color: #9CA3AF;">${n.time}</div>
@@ -1179,23 +1448,33 @@ const updateDynamicUI = () => {
     if (window.lucide) window.lucide.createIcons();
   }
 
+  // Update Supporters List
+  const supportersList = document.getElementById('supporters-list');
+  if (supportersList) {
+    if (state.notifications.length === 0) {
+      supportersList.innerHTML = `<div style="text-align: center; color: #9CA3AF; padding: 20px;">No supporters yet</div>`;
+    } else {
+      supportersList.innerHTML = state.notifications.map((n, idx) => `
+        <div class="method-card" style="padding: 18px; border-radius: 20px; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: ${idx < 3 ? '#FFFBEB' : '#F3F4F6'}; color: ${idx < 3 ? '#F79F1A' : '#9CA3AF'}; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px;">${idx + 1}</div>
+            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(n.text.split(':')[0])}" class="avatar-sm">
+            <div>
+              <div style="font-weight: 700;">${n.text.split('from ')[1]?.split(':')[0] || 'Supporter'}</div>
+              <div style="font-size: 11px; color: #9CA3AF;">${n.time} • TON</div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 700; color: #10B981; font-size: 16px;">${n.text.match(/\$([0-9.]+)/) ? n.text.match(/\$([0-9.]+)/)[0] : ''}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
   // --- Dashboard avatar ---
   const dashAvatar = document.getElementById('dashboard-avatar');
   if (dashAvatar && state.creator.avatar) dashAvatar.src = state.creator.avatar;
-
-  // --- Stat cards from tip history ---
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekStart  = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
-
-  const completedTips = state.notifications.filter(n => n.type === 'tip');
-  let todayTotal = 0, weekTotal = 0, allTotal = state.balance;
-
-  completedTips.forEach(n => {
-    const amt = parseFloat((n.text.match(/\$([0-9.]+)/) || [])[1] || 0);
-    todayTotal += amt;
-    weekTotal  += amt;
-  });
 
   const statToday   = document.getElementById('stat-today');
   const statWeek    = document.getElementById('stat-week');
@@ -1203,6 +1482,9 @@ const updateDynamicUI = () => {
   if (statToday)   statToday.innerText   = `$${todayTotal.toFixed(0)}`;
   if (statWeek)    statWeek.innerText    = `$${weekTotal.toFixed(0)}`;
   if (statAlltime) statAlltime.innerText = `$${allTotal.toLocaleString(undefined, {maximumFractionDigits: 0})}`;
+
+  const currentBalanceDisplays = document.querySelectorAll('.current-balance');
+  currentBalanceDisplays.forEach(el => el.innerText = `$${allTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`);
 
   // --- Payout wallet status in Settings ---
   const notSet       = document.getElementById('wallet-not-set');
@@ -1230,8 +1512,8 @@ const showLoadingOverlay = (show, message = 'Processing...') => {
     `;
     document.getElementById('app').appendChild(overlay);
     
-    // Play animation
-    this.playLottie('lottie-container-overlay', '/coin-jar.json');
+    // Play animation — use App reference instead of broken `this`
+    App.playLottie('lottie-container-overlay', '/coin-jar.json');
   }
   
   const msgEl = document.getElementById('loading-message');
@@ -1252,6 +1534,44 @@ const showToast = (message) => {
   }, 3000);
 };
 
+// Export to window for inline onclick handlers
+window.showToast = showToast;
+window.showConfetti = showConfetti;
+window.showLoadingOverlay = showLoadingOverlay;
+window.updateDynamicUI = updateDynamicUI;
+
+window.confirmWithdraw = async () => {
+  if (state.balance < 10) {
+    showToast("Minimum withdrawal is $10.00");
+    return;
+  }
+  if (!state.walletAddress || state.walletAddress === '0x71C...39A2') {
+    showToast("Please set your Payout Wallet in Settings first.");
+    return;
+  }
+
+  showLoadingOverlay(true, "Processing withdrawal...");
+  try {
+    await requestWithdrawal(dbCreator.id, {
+      grossAmount: state.balance,
+      wallet: state.walletAddress,
+      currency: 'TON'
+    });
+    
+    state.balance = 0; 
+    await window.updateDynamicUI();
+    
+    const modal = document.getElementById('withdraw-modal');
+    if(modal) modal.classList.remove('active');
+    
+    showLoadingOverlay(false);
+    showToast("Withdrawal requested successfully!");
+  } catch (e) {
+    showLoadingOverlay(false);
+    showToast("Failed to request withdrawal.");
+    console.error(e);
+  }
+};
 
 // ============================================================
 // First-Tip Celebration
@@ -1373,86 +1693,74 @@ window.updateSettingsShareLink = () => {
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize non-UI logic
   App.init();
   
-  // Set images
   const welcomeCard = document.getElementById('card-welcome');
   const readyCard   = document.getElementById('card-ready');
-  const alexAvatar  = document.getElementById('alex-avatar');
-  const summaryAvatar = document.getElementById('summary-avatar');
-
   if (welcomeCard) welcomeCard.style.backgroundImage = 'url(/creator_card.png)';
   if (readyCard)   readyCard.style.backgroundImage   = 'url(/creator_card.png)';
 
   const urlParams      = new URLSearchParams(window.location.search);
   const creatorIdParam = urlParams.get('creator');
+  state.chatId         = urlParams.get('chat_id');
 
+  // Authenticate creator if inside Telegram Web App
+  const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  if (tgUser) {
+    try {
+      const creator = await initTelegramAuth();
+      dbCreator = creator;
+      state.creator.name = creator.display_name;
+      state.creator.handle = `@${creator.username || 'creator'}`;
+      state.creator.avatar = creator.avatar_url || state.creator.avatar;
+      state.selectedCreatorId = creator.id;
+      state.walletAddress = creator.withdrawal_wallet || creator.payout_wallet || state.walletAddress;
+    } catch (err) {
+      console.warn('[TipJar] Telegram auth failed, continuing as guest', err);
+    }
+  }
+
+  // Determine initial step and role
   if (creatorIdParam) {
     try {
       const { data: targetCreator } = await supabase
         .from('creators')
-        .select('id, telegram_id, display_name, username, avatar_url, goal_title')
+        .select('id, telegram_id, display_name, username, avatar_url, goal_title, goal_target, balance_usd')
         .eq('id', creatorIdParam)
         .single();
 
       if (targetCreator) {
+        // If the viewer is the creator themselves, treat them as OWNER
+        if (dbCreator && dbCreator.id === targetCreator.id) {
+          state.userRole = 'OWNER';
+        } else {
+          state.userRole = 'VIEWER';
+        }
+
         state.creator.name   = targetCreator.display_name;
         state.creator.handle = `@${targetCreator.username || 'creator'}`;
         state.creator.avatar = targetCreator.avatar_url || state.creator.avatar;
         state.selectedCreatorId = targetCreator.id;
+        
+        // Update goal state from real data
+        state.goal.title = targetCreator.goal_title || state.goal.title;
+        state.goal.target = targetCreator.goal_target || state.goal.target;
+        state.balance = targetCreator.balance_usd || 0;
 
-        const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-        if (tgUser) {
-          state.tipperName   = `${tgUser.first_name || ''} ${tgUser.last_name || ''}`.trim();
-          state.tipperHandle = tgUser.username ? `@${tgUser.username}` : null;
-        }
-
-        updateDynamicUI();
-        nextStep(4);
+        state.currentStep = 4; // Tipping Profile
       }
     } catch (err) {
       console.warn('[TipJar] Error loading creator:', err);
     }
-  } else {
-    try {
-      const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
-      if (tgUser) {
-        const { data: creator } = await supabase
-          .from('creators')
-          .select('*')
-          .eq('telegram_id', tgUser.id.toString())
-          .single();
-
-        if (creator) {
-          dbCreator = creator;
-          state.creator.name = creator.display_name;
-          state.creator.handle = `@${creator.username || 'creator'}`;
-          state.creator.avatar = creator.avatar_url || state.creator.avatar;
-          state.payoutWallet = creator.payout_wallet;
-
-          // SKIP: Go to dashboard but DON'T return, allow rest of init to run
-          console.log('[TipJar] 🏠 Returning creator recognized.');
-          nextStep(7);
-        }
-      }
-    } catch (err) {
-      console.warn('[TipJar] Offline mode');
-    }
-
-    // Persistent Onboarding Check
-    const hasOnboarded = localStorage.getItem('tipjar_onboarded') === 'true';
-    if (hasOnboarded && !creatorIdParam) {
-      console.log('[TipJar] ⏩ Onboarding already completed.');
-      setTimeout(() => nextStep(7), 100); // Small delay to ensure App.init finishes
-    }
-  }
-
-  if (alexAvatar) alexAvatar.src = state.creator.avatar;
-  if (summaryAvatar) summaryAvatar.src = state.creator.avatar;
-  const receiptAvatar = document.getElementById('receipt-avatar');
-  if (receiptAvatar) receiptAvatar.src = state.creator.avatar;
-
-  document.querySelectorAll('.alex-name').forEach(el => el.innerText = state.creator.name);
-  window.animateGoal();
-  updateDynamicUI();
-});
+  } else if (dbCreator) {
+    state.userRole = 'OWNER';
+    state.currentStep = 7; // Dashboard
+    
+    // Sync dashboard creator state
+    state.creator.name = dbCreator.display_name;
+    state.creator.handle = `@${dbCreator.username || 'creator'}`;
+    state.creator.avatar = dbCreator.avatar_url || state.creator.avatar;
+    state.selectedCreatorId = dbCreator.id;
+    state.goal.title = dbCreator.goal_title || state.goal.title;
+    state.goal.target = dbCreator.goal_target || state.goal.
