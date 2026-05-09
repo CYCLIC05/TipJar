@@ -136,7 +136,7 @@ const App = {
     const txIdEl = document.getElementById('receipt-tx-id');
 
     try {
-      const MERCHANT_ADDRESS = 'UQApmfWYM1_cftB0aGSarN5s4DALmoBT0KTaDMKPHaTXvJg1';
+      const MERCHANT_ADDRESS = import.meta.env.VITE_MERCHANT_ADDRESS || 'UQApmfWYM1_cftB0aGSarN5s4DALmoBT0KTaDMKPHaTXvJg1';
       
       // 1. Update UI to PENDING
       if (statusEl) { statusEl.innerText = 'PROCESSING...'; statusEl.style.color = '#F79F1A'; }
