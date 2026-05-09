@@ -147,9 +147,9 @@ export async function completeTip(invoiceId) {
 // WITHDRAWAL FUNCTIONS
 // ===========================
 
-/** Create a withdrawal request (10% fee deducted by backend) */
+/** Create a withdrawal request (5% fee deducted by platform) */
 export async function requestWithdrawal(creatorId, { grossAmount, wallet, currency }) {
-  const platformFee = grossAmount * 0.10;
+  const platformFee = grossAmount * 0.05;
   const netAmount = grossAmount - platformFee;
 
   // 1. Insert withdrawal record
