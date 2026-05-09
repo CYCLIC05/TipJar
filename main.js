@@ -136,7 +136,7 @@ const App = {
     const txIdEl = document.getElementById('receipt-tx-id');
 
     try {
-      const MERCHANT_ADDRESS = 'UQDwT-v0d7vO-u6nO7wA99N61v0p5wzP-5p8V4O0x_1W6fHj'; // REPLACE THIS with your platform wallet address
+      const MERCHANT_ADDRESS = 'UQApmfWYM1_cftB0aGSarN5s4DALmoBT0KTaDMKPHaTXvJg1';
       
       // 1. Update UI to PENDING
       if (statusEl) { statusEl.innerText = 'PROCESSING...'; statusEl.style.color = '#F79F1A'; }
