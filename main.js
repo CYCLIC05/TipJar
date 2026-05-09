@@ -17,13 +17,13 @@ const state = {
   selectedAmount: 5,
   customAmount: '',
   selectedMethod: 'usdt',
-  balance: 2450.12,
+  balance: 0,
   notifications: [], // Will be populated from Supabase
   liveFeed: [], // Public live feed
   creator: {
-    name: 'Alex Rivers',
-    handle: '@alex_creates',
-    avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Alex'
+    name: 'Loading...',
+    handle: '@...',
+    avatar: 'https://api.dicebear.com/7.x/adventurer/svg?seed=TipJar'
   },
   onboardingTimer: null,
   isScratching: false,
@@ -35,12 +35,12 @@ const state = {
   },
   thankYouMessage: "Thanks for the support! It means the world to me. Keep being awesome!",
   selectedMessage: '',
-  walletAddress: "0x71C...39A2",
+  walletAddress: "",
   tonAddress: null,
   goal: {
-    title: 'New Studio Camera 🎥',
-    current: 2450.12,
-    target: 3000
+    title: 'My Creator Goal',
+    current: 0,
+    target: 1000
   },
   liveSimTimer: null,
   chatId: null, // Stores the Telegram chat ID if tipped from a group
@@ -626,7 +626,9 @@ const startOnboardingTimer = (step) => {
 
   state.onboardingTimer = setTimeout(() => {
     if (step === 1) {
-      nextStep(3); // Skip step 2 (Interests)
+      nextStep(2);
+    } else if (step === 2) {
+      nextStep(3);
     } else if (step === 3) {
       nextStep(7); // Go to Dashboard
     }
@@ -1398,15 +1400,23 @@ const updateDynamicUI = async () => {
 
   // Fetch real analytics and history if viewing as creator
   let todayTotal = 0, weekTotal = 0, allTotal = state.balance;
-  if (dbCreator && state.selectedCreatorId === dbCreator.id) {
+  
+  const targetId = state.selectedCreatorId || (dbCreator ? dbCreator.id : null);
+  
+  if (targetId) {
     try {
-      const metrics = await getAnalyticsMetrics(dbCreator.id);
-      todayTotal = metrics.today;
-      weekTotal = metrics.week;
-      allTotal = metrics.total;
-      state.balance = allTotal; // sync local balance state
+      // If we are the owner, get full analytics
+      if (dbCreator && targetId === dbCreator.id) {
+        const metrics = await getAnalyticsMetrics(dbCreator.id);
+        todayTotal = metrics.today;
+        weekTotal = metrics.week;
+        allTotal = metrics.total;
+        state.balance = allTotal; 
+        state.goal.current = allTotal;
+      }
       
-      const tips = await getCreatorTips(dbCreator.id, 20);
+      // Fetch tips for activity feed/podium for ANY creator being viewed
+      const tips = await getCreatorTips(targetId, 20);
       state.notifications = tips.map(t => ({
         id: t.id,
         text: `New tip from ${t.tipper_name || 'Supporter'}: $${(t.usd_value || 0).toFixed(2)}`,
@@ -1414,7 +1424,7 @@ const updateDynamicUI = async () => {
         type: 'tip'
       }));
     } catch (e) {
-      console.warn('[TipJar] Could not load metrics:', e);
+      console.warn('[TipJar] Could not load metrics/tips:', e);
     }
   }
 
@@ -1497,6 +1507,142 @@ const updateDynamicUI = async () => {
   if (savedDisplay) savedDisplay.style.display   = isWalletSet ? 'block' : 'none';
   if (addrDisplay && isWalletSet)  addrDisplay.innerText  = state.walletAddress;
   if (walletInput  && isWalletSet) walletInput.value      = state.walletAddress;
+
+  // --- Dynamic Template Population ---
+  
+  // 1. Top Supporter Card on Profile
+  const topSupporterCard = document.getElementById('top-supporter-card');
+  if (topSupporterCard) {
+    const validTips = state.notifications.filter(n => n.type === 'tip');
+    if (validTips.length > 0) {
+      const topTip = [...validTips].sort((a, b) => {
+        const valA = parseFloat(a.text.match(/\$([0-9.]+)/)?.[1] || 0);
+        const valB = parseFloat(b.text.match(/\$([0-9.]+)/)?.[1] || 0);
+        return valB - valA;
+      })[0];
+      
+      const name = topTip.text.split('from ')[1]?.split(':')[0] || 'Supporter';
+      const amount = topTip.text.match(/\$([0-9.]+)/)?.[0] || '$0';
+      topSupporterCard.innerHTML = `
+          <div style="background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%); border: 1px solid #FCD34D; border-radius: 20px; padding: 12px 16px; margin: 24px 24px 0; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.15);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="position: relative;">
+                <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=${name}" style="width: 42px; height: 42px; border-radius: 50%; border: 2px solid #F59E0B;">
+                <div style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%);">
+                  <i data-lucide="crown" style="width: 18px; height: 18px; color: #F59E0B; fill: #F59E0B;"></i>
+                </div>
+              </div>
+              <div style="text-align: left;">
+                <div style="font-size: 10px; font-weight: 800; color: #D97706; text-transform: uppercase; letter-spacing: 0.05em;">Top Supporter</div>
+                <div style="font-size: 14px; font-weight: 800; color: #92400E;">${name}</div>
+              </div>
+            </div>
+            <div style="font-size: 16px; font-weight: 900; color: #D97706;">${amount}</div>
+          </div>
+      `;
+      topSupporterCard.style.display = 'block';
+    } else {
+      topSupporterCard.style.display = 'none';
+    }
+  }
+
+  // 2. Dashboard Activity List
+  const dashActivity = document.getElementById('dashboard-activity-list');
+  if (dashActivity) {
+    if (state.notifications.length === 0) {
+      dashActivity.innerHTML = `<div style="text-align: center; color: #9CA3AF; padding: 20px;">No activity yet</div>`;
+    } else {
+      dashActivity.innerHTML = state.notifications.slice(0, 5).map(n => `
+        <div class="supporter-item" style="border: none; background: white; padding: 16px; border-radius: 20px; border: 1px solid #F3F4F6; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(n.text.split('from ')[1]?.split(':')[0] || 'S')}" class="avatar-sm">
+            <div>
+              <div style="font-weight: 700; font-size: 14px;">${n.text.split('from ')[1]?.split(':')[0] || 'Supporter'}</div>
+              <div style="font-size: 11px; color: #9CA3AF;">${n.time} • TON</div>
+            </div>
+          </div>
+          <div style="color: #10B981; font-weight: 700;">+${n.text.match(/\$([0-9.]+)/)?.[0] || '$0'}</div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // 3. Podium Population
+  const podiumContainer = document.getElementById('podium-container');
+  if (podiumContainer) {
+    const validTips = state.notifications.filter(n => n.type === 'tip');
+    if (validTips.length > 0) {
+      const sorted = [...validTips].sort((a, b) => {
+        const valA = parseFloat(a.text.match(/\$([0-9.]+)/)?.[1] || 0);
+        const valB = parseFloat(b.text.match(/\$([0-9.]+)/)?.[1] || 0);
+        return valB - valA;
+      });
+      
+      const p1 = sorted[0];
+      const p2 = sorted[1];
+      const p3 = sorted[2];
+      
+      const renderRank = (n, rank, width, height, color, fallbackSeed) => {
+        if (!n) return '';
+        const name = n.text.split('from ')[1]?.split(':')[0] || 'Supporter';
+        const amount = n.text.match(/\$([0-9.]+)/)?.[0] || '$0';
+        return `
+          <div class="podium-rank rank-${rank}" style="display: flex; flex-direction: column; align-items: center; position: relative; width: ${width}px; ${rank === 1 ? 'z-index: 10;' : ''}">
+            ${rank === 1 ? `<div style="position: absolute; top: -32px; left: 50%; transform: translateX(-50%);"><i data-lucide="crown" style="width: 28px; height: 28px; fill: #F79F1A; color: #F79F1A;"></i></div>` : ''}
+            <div style="position: relative; margin-bottom: 12px;">
+              ${rank === 1 ? `<div class="glow-ring" style="position: absolute; inset: -6px; border-radius: 50%; background: linear-gradient(135deg, #F79F1A 0%, #FBBF24 100%); opacity: 0.2; filter: blur(8px);"></div>` : ''}
+              <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=${name}" style="width: ${rank === 1 ? 80 : 56}px; height: ${rank === 1 ? 80 : 56}px; border-radius: 50%; border: ${rank === 1 ? '4px solid #F79F1A' : '3px solid white'}; box-shadow: 0 10px 20px rgba(0,0,0,0.1); position: relative; z-index: 1;">
+              <div style="position: absolute; bottom: -2px; right: 2px; width: ${rank === 1 ? 30 : 24}px; height: ${rank === 1 ? 30 : 24}px; background: ${color}; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: ${rank === 1 ? 14 : 12}px; font-weight: 800; border: ${rank === 1 ? 3 : 2}px solid white; z-index: 2;">${rank}</div>
+            </div>
+            <div style="font-weight: ${rank === 1 ? 800 : 700}; font-size: ${rank === 1 ? 12 : 11}px; color: #1E293B; margin-bottom: 6px; text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${name}</div>
+            <div style="background: white; width: 100%; padding: ${rank === 1 ? 16 : 12}px 4px; border-radius: ${rank === 1 ? 20 : 16}px ${rank === 1 ? 20 : 16}px 0 0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); text-align: center; border: 1px solid #F1F5F9; height: ${height}px;">
+              <div style="font-size: ${rank === 1 ? 16 : 13}px; font-weight: ${rank === 1 ? 900 : 800}; color: ${rank === 1 ? '#F79F1A' : '#1E293B'};">${amount}</div>
+            </div>
+          </div>
+        `;
+      };
+      
+      podiumContainer.innerHTML = `
+        ${renderRank(p2, 2, 100, 60, '#94A3B8')}
+        ${renderRank(p1, 1, 120, 90, '#F79F1A')}
+        ${renderRank(p3, 3, 100, 45, '#D97706')}
+      `;
+    } else {
+      podiumContainer.innerHTML = `<div style="text-align: center; color: #9CA3AF; width: 100%; padding: 40px 0;">No supporters to display.</div>`;
+    }
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+
+  // --- Role-based UI Toggles ---
+  const dashNav = document.getElementById('dashboard-nav');
+  const switchBtn = document.getElementById('switch-to-dashboard');
+  const profileBackBtn = document.getElementById('profile-back-btn');
+  const switchBtnText = document.getElementById('switch-btn-text');
+
+  if (state.userRole === 'OWNER') {
+    if (dashNav) dashNav.style.display = 'flex';
+    if (switchBtn) {
+      switchBtn.style.display = 'block';
+      if (switchBtnText) switchBtnText.innerText = 'Switch to My Dashboard';
+      switchBtn.onclick = () => nextStep(7);
+    }
+    if (profileBackBtn) profileBackBtn.style.display = 'flex';
+  } else {
+    if (dashNav) dashNav.style.display = 'none';
+    if (switchBtn) {
+      switchBtn.style.display = 'block';
+      if (switchBtnText) switchBtnText.innerText = 'Create My TipJar';
+      switchBtn.onclick = () => {
+        // Clear param so they go to their own onboarding/dashboard
+        const url = new URL(window.location.href);
+        url.searchParams.delete('creator');
+        window.history.pushState({}, '', url);
+        location.reload(); // Hard reload to reset state as OWNER
+      };
+    }
+    if (profileBackBtn) profileBackBtn.style.display = 'none';
+  }
 };
 
 const showLoadingOverlay = (show, message = 'Processing...') => {
@@ -1763,4 +1909,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.creator.avatar = dbCreator.avatar_url || state.creator.avatar;
     state.selectedCreatorId = dbCreator.id;
     state.goal.title = dbCreator.goal_title || state.goal.title;
-    state.goal.target = dbCreator.goal_target || state.goal.
+    state.goal.target = dbCreator.goal_target || state.goal.target;
+    state.balance = dbCreator.balance_usd || 0;
+  } else {
+    try {
+      // Not in Telegram or no user info - check local storage
+      const hasOnboarded = localStorage.getItem('tipjar_onboarded') === 'true';
+      state.userRole = 'OWNER'; // If no param and no dbCreator, assume they are starting fresh
+      state.currentStep = hasOnboarded ? 7 : 1;
+    } catch (err) {
+      console.warn('[TipJar] Initialization fallback');
+      state.userRole = 'OWNER';
+      state.currentStep = 1;
+    }
+  }
+
+  // Final Render
+  App.render();
+  
+  if (state.currentStep === 8) {
+    App.loadTopSupporters();
+  }
+  if (state.currentStep === 9 && window.updateSettingsShareLink) {
+    window.updateSettingsShareLink();
+  }
+
+  // Start onboarding timer if we're on step 1
+  if (state.currentStep === 1) {
+    startOnboardingTimer(1);
+  }
+
+  // Sync Avatars
+  if (state.creator) {
+    const alexAvatar  = document.getElementById('alex-avatar');
+    const summaryAvatar = document.getElementById('summary-avatar');
+    const receiptAvatar = document.getElementById('receipt-avatar');
+    if (alexAvatar) alexAvatar.src = state.creator.avatar || '';
+    if (summaryAvatar) summaryAvatar.src = state.creator.avatar || '';
+    if (receiptAvatar) receiptAvatar.src = state.creator.avatar || '';
+
+    document.querySelectorAll('.alex-name').forEach(el => el.innerText = state.creator.name || 'Creator');
+  }
+  
+  if (window.animateGoal) window.animateGoal();
+});
