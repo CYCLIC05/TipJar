@@ -52,7 +52,7 @@
         <button class="btn-outline" onclick="toggleInterest(this, 'Food')">🍕 Food</button>
       </div>
       
-      <button class="btn-primary" style="margin-top: auto;" onclick="nextStep(3)">
+      <button class="btn-primary" style="margin-top: auto;" onclick="saveInterestsAndContinue()">
         Continue <i data-lucide="chevron-right" style="width: 20px; height: 20px;"></i>
       </button>
     </div>
@@ -95,7 +95,7 @@
         </div>
         <h2 style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span class="alex-name">Alex Rivers</span> <i data-lucide="check-circle" style="width: 18px; height: 18px; fill: #1D9BF0; color: white;"></i></h2>
         <p style="color: #6B7280; font-size: 14px;" class="alex-handle">@alex_creates</p>
-        <p style="color: #6B7280; font-size: 14px; margin-top: 12px; padding: 0 20px;">Thanks for supporting my work! Every tip helps me create more content for you.</p>
+        <p id="creator-bio" style="color: #6B7280; font-size: 14px; margin-top: 12px; padding: 0 20px;">Thanks for supporting my work! Every tip helps me create more content for you.</p>
         
         <div id="top-supporter-card" style="display: none;">
           <!-- Populated by JS -->

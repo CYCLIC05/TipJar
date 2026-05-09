@@ -44,7 +44,8 @@ const state = {
   },
   liveSimTimer: null,
   chatId: null, // Stores the Telegram chat ID if tipped from a group
-  userRole: 'VIEWER' // 'OWNER' or 'VIEWER'
+  userRole: 'VIEWER', // 'OWNER' or 'VIEWER'
+  interests: []
 };
 
 // --- App Controller ---
@@ -1508,6 +1509,12 @@ const updateDynamicUI = async () => {
   if (addrDisplay && isWalletSet)  addrDisplay.innerText  = state.walletAddress;
   if (walletInput  && isWalletSet) walletInput.value      = state.walletAddress;
 
+  // Bio Population
+  const bioEl = document.getElementById('creator-bio');
+  if (bioEl && state.creator.bio) {
+    bioEl.innerText = state.creator.bio;
+  }
+
   // --- Dynamic Template Population ---
   
   // 1. Top Supporter Card on Profile
@@ -1872,7 +1879,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const { data: targetCreator } = await supabase
         .from('creators')
-        .select('id, telegram_id, display_name, username, avatar_url, goal_title, goal_target, balance_usd')
+        .select('id, telegram_id, display_name, username, avatar_url, goal_title, goal_target, balance_usd, bio')
         .eq('id', creatorIdParam)
         .single();
 
@@ -1887,6 +1894,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.creator.name   = targetCreator.display_name;
         state.creator.handle = `@${targetCreator.username || 'creator'}`;
         state.creator.avatar = targetCreator.avatar_url || state.creator.avatar;
+        state.creator.bio    = targetCreator.bio || state.creator.bio;
         state.selectedCreatorId = targetCreator.id;
         
         // Update goal state from real data
@@ -1907,6 +1915,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     state.creator.name = dbCreator.display_name;
     state.creator.handle = `@${dbCreator.username || 'creator'}`;
     state.creator.avatar = dbCreator.avatar_url || state.creator.avatar;
+    state.creator.bio    = dbCreator.bio || state.creator.bio;
     state.selectedCreatorId = dbCreator.id;
     state.goal.title = dbCreator.goal_title || state.goal.title;
     state.goal.target = dbCreator.goal_target || state.goal.target;
@@ -1953,3 +1962,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   if (window.animateGoal) window.animateGoal();
 });
+
+window.toggleInterest = (btn, interest) => {
+  btn.classList.toggle('selected');
+  if (btn.classList.contains('selected')) {
+    state.interests.push(interest);
+  } else {
+    state.interests = state.interests.filter(i => i !== interest);
+  }
+};
+
+window.saveInterestsAndContinue = async () => {
+  if (state.interests.length < 1) {
+    showToast("Please pick at least one interest!");
+    return;
+  }
+  
+  if (dbCreator) {
+    try {
+      await supabase.from('creators').update({ interests: state.interests }).eq('id', dbCreator.id);
+    } catch (e) {
+      console.warn('[TipJar] Failed to save interests');
+    }
+  }
+  
+  nextStep(3);
+};
