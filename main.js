@@ -49,7 +49,21 @@ const state = {
 };
 
 // --- App Controller ---
-const App = {
+  let publicTipSubscription = null;
+  
+  const setupRealtimeListeners = (creatorId) => {
+    if (publicTipSubscription) return;
+    
+    console.log('[TipJar] Setting up real-time support feed...');
+    publicTipSubscription = subscribeToPublicTips(creatorId, (payload) => {
+      console.log('[TipJar] NEW TIP RECEIVED REALTIME:', payload);
+      showToast(`🎉 New tip received from ${payload.tipper_name || 'Supporter'}!`, 'success');
+      triggerHaptic('success');
+      updateDynamicUI(); // Refresh UI
+    });
+  };
+
+  const App = {
   init() {
     this.bindEvents();
     this.initTonConnect();
@@ -880,6 +894,40 @@ window.saveThankYouMessage = () => {
   const msg = document.querySelector('#step-9 textarea').value;
   state.thankYouMessage = msg;
   showToast("Thank you message saved!");
+  triggerHaptic('success');
+};
+
+window.saveProfile = async () => {
+  const bio = document.getElementById('edit-bio-input').value;
+  const goalTitle = document.getElementById('edit-goal-title-input').value;
+  const goalTarget = parseFloat(document.getElementById('edit-goal-target-input').value);
+
+  if (!dbCreator) return;
+
+  showLoadingOverlay(true, 'Updating profile...');
+  try {
+    const { error } = await updateCreator(dbCreator.id, {
+      bio: bio,
+      goal_title: goalTitle,
+      goal_target: goalTarget
+    });
+
+    if (error) throw error;
+
+    // Update local state
+    state.creator.bio = bio;
+    state.goal.title = goalTitle;
+    state.goal.target = goalTarget;
+
+    showToast('✅ Profile updated successfully!', 'success');
+    updateDynamicUI();
+    triggerHaptic('success');
+  } catch (err) {
+    console.warn('[TipJar] Profile update failed:', err);
+    showToast('Failed to update profile.', 'error');
+  } finally {
+    showLoadingOverlay(false);
+  }
 };
 
 window.changeWallet = () => {
@@ -1437,6 +1485,7 @@ const updateDynamicUI = async () => {
   const targetId = state.selectedCreatorId || (dbCreator ? dbCreator.id : null);
   
   if (targetId) {
+    setupRealtimeListeners(targetId);
     showSkeletons(true);
     try {
       // If we are the owner, get full analytics
@@ -1464,6 +1513,28 @@ const updateDynamicUI = async () => {
     } finally {
       showSkeletons(false);
     }
+  }
+
+  // Pre-fill profile editor if open
+  if (state.currentStep === 9) {
+    const bioInput = document.getElementById('edit-bio-input');
+    const titleInput = document.getElementById('edit-goal-title-input');
+    const targetInput = document.getElementById('edit-goal-target-input');
+    
+    if (bioInput && bioInput.value === "") bioInput.value = state.creator.bio || '';
+    if (titleInput && titleInput.value === "") titleInput.value = state.goal.title || '';
+    if (targetInput && targetInput.value === "") targetInput.value = state.goal.target || 0;
+  }
+
+  // Pre-fill profile editor if open
+  if (state.currentStep === 9) {
+    const bioInput = document.getElementById('edit-bio-input');
+    const titleInput = document.getElementById('edit-goal-title-input');
+    const targetInput = document.getElementById('edit-goal-target-input');
+    
+    if (bioInput && !bioInput.value) bioInput.value = state.creator.bio || '';
+    if (titleInput && !titleInput.value) titleInput.value = state.goal.title || '';
+    if (targetInput && !targetInput.value) targetInput.value = state.goal.target || 0;
   }
 
   // Update Notifications (Activity Feed)

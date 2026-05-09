@@ -28,29 +28,28 @@
 
 body {
   font-family: var(--font-main);
-  background-color: #E5E7EB; /* Grey background only for desktop */
+  background-color: #E5E7EB;
   color: var(--text-main);
   line-height: 1.5;
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* Ensure app starts at the top */
+  align-items: center; /* Center on desktop */
   min-height: 100vh;
-  min-height: -webkit-fill-available;
   margin: 0;
   padding: 0;
-  overflow: hidden; /* Prevent body itself from scrolling */
 }
 
 #app {
   width: 100%;
   max-width: 480px;
-  height: 100vh;
-  height: -webkit-fill-available;
+  height: 92vh; /* Slight gap on desktop for premium look */
+  max-height: 900px;
   background-color: white;
   position: relative;
   display: flex;
   flex-direction: column;
   box-shadow: 0 50px 100px -20px rgba(0,0,0,0.2);
+  border-radius: 40px;
   overflow: hidden;
 }
 
@@ -60,10 +59,10 @@ body {
     height: -webkit-fill-available;
     max-height: none;
     border-radius: 0;
-    border: none;
   }
   body {
-    background-color: white; /* Hide grey on mobile completely */
+    background-color: white;
+    align-items: flex-start; /* Start at top for mobile */
   }
 }
 

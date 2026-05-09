@@ -585,6 +585,35 @@
             <p style="font-size: 11px; color: #9CA3AF; margin-top: 8px; text-align: center;">Connect your wallet to enable instant Web3 payouts</p>
           </div>
         </div>
+
+        <div class="settings-section" style="margin-top: 32px; border-top: 1px solid var(--border); padding-top: 32px;">
+          <h3 style="font-size: 16px; font-weight: 800; margin-bottom: 20px;">Edit Public Profile</h3>
+          
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 700; color: #4B5563; margin-bottom: 8px; display: block;">Public Bio</label>
+            <textarea id="edit-bio-input" placeholder="Tell your supporters what you are creating..." style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); font-family: inherit; font-size: 13px; outline: none; height: 80px; resize: none;"></textarea>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 700; color: #4B5563; margin-bottom: 8px; display: block;">Goal Title</label>
+            <input type="text" id="edit-goal-title-input" placeholder="e.g. New Studio Camera" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); font-size: 13px; outline: none;">
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 700; color: #4B5563; margin-bottom: 8px; display: block;">Goal Target ($)</label>
+            <input type="number" id="edit-goal-target-input" placeholder="e.g. 1000" style="width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border); font-size: 13px; outline: none;">
+          </div>
+
+          <button class="btn-primary" style="width: 100%; margin-top: 24px; background: #111827;" onclick="saveProfile()">
+            Save Profile Changes <i data-lucide="save" style="width: 18px; height: 18px; margin-left: 8px;"></i>
+          </button>
+        </div>
+
+        <div style="margin-top: 40px; padding-bottom: 40px;">
+          <button class="btn-outline" style="width: 100%; color: #EF4444; border-color: #FEE2E2;" onclick="localStorage.clear(); location.reload();">
+            Logout
+          </button>
+        </div>
       </div>
     </div>
 
