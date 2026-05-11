@@ -83,12 +83,43 @@ const state = {
       if (state.liveFeed.length > 50) state.liveFeed.pop();
       
       // Show toast to active viewers
-      showToast(toastText);
+      if (window.showToast) showToast(toastText);
       
       // If it's a tip to the current creator, update notifications and balance if not already done locally
       if (dbCreator && newTip.creator_id === dbCreator.id) {
         // Refresh analytics
-        updateDynamicUI();
+        if (window.updateDynamicUI) updateDynamicUI();
+        
+        // Dynamically inject into Wall of Support if viewing
+        const list = document.getElementById('supporters-list');
+        if (list && state.currentStep === 4) {
+          const newItem = document.createElement('div');
+          newItem.className = 'animate-enter';
+          newItem.style.cssText = 'min-width: 160px; padding: 16px; background: #FFFFFF; border: 1px solid #F3F4F6; border-radius: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.02); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;';
+          newItem.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <img src="https://api.dicebear.com/7.x/adventurer/svg?seed=${name}" style="width: 28px; height: 28px; border-radius: 50%; background: #F3F4F6;">
+              <div>
+                <div style="font-size: 12px; font-weight: 800; color: #111827;">${name}</div>
+                <div style="font-size: 10px; color: #10B981; font-weight: 700;">$${amt}</div>
+              </div>
+            </div>
+            ${newTip.message ? '<div style="font-size: 11px; color: #6B7280; line-height: 1.4; font-style: italic; background: #F9FAFB; padding: 8px 12px; border-radius: 14px;">"' + newTip.message + '"</div>' : ''}
+            <button onclick="window.selectTip(${amt}); document.getElementById('step-4').scrollIntoView({behavior: 'smooth'})" style="width: 100%; padding: 6px; background: #F9FAFB; color: #111827; border: 1px solid #E5E7EB; border-radius: 10px; font-size: 11px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 4px;"><i data-lucide="plus" style="width: 12px; height: 12px;"></i> Match</button>
+          `;
+          
+          if (list.children.length === 1 && list.children[0].innerText.includes('Be the first!')) {
+            list.innerHTML = '';
+          }
+          list.insertBefore(newItem, list.firstChild);
+          if (window.lucide) window.lucide.createIcons();
+          
+          const countEl = document.getElementById('supporter-count');
+          if (countEl) {
+             const currentCount = parseInt(countEl.innerText) || 0;
+             countEl.innerText = `${currentCount + 1} Tippers`;
+          }
+        }
       }
     });
   },
@@ -285,9 +316,14 @@ const state = {
       showLoadingOverlay(false);
       console.error('[TipJar] Payment Error:', err);
       
-      // Update Receipt to FAILED
-      if (statusEl) { statusEl.innerText = 'FAILED'; statusEl.style.color = '#EF4444'; }
-      if (txIdEl) txIdEl.innerText = err.message || 'Transaction was rejected or timed out.';
+      const isUserCancellation = err.message?.includes('User rejects') || err.message?.toLowerCase().includes('reject');
+      
+      // Update Receipt to FAILED or CANCELLED
+      if (statusEl) { 
+        statusEl.innerText = isUserCancellation ? 'CANCELLED' : 'FAILED'; 
+        statusEl.style.color = isUserCancellation ? '#6B7280' : '#EF4444'; 
+      }
+      if (txIdEl) txIdEl.innerText = isUserCancellation ? 'Transaction cancelled by user.' : (err.message || 'Transaction was rejected or timed out.');
       
       // Restore button for retry
       if (sendTxBtn) {
@@ -300,10 +336,10 @@ const state = {
       // Update header to guide user
       const headerTitle = document.querySelector('#awaiting-header h1');
       const headerText = document.querySelector('#awaiting-header p');
-      if (headerTitle) headerTitle.innerText = 'Payment Failed';
-      if (headerText) headerText.innerText = 'The transaction was rejected. You can try again below.';
+      if (headerTitle) headerTitle.innerText = isUserCancellation ? 'Payment Cancelled' : 'Payment Failed';
+      if (headerText) headerText.innerText = isUserCancellation ? 'You cancelled the transaction in your wallet.' : 'The transaction was rejected. You can try again below.';
 
-      showToast('Payment rejected or timed out.');
+      if (window.showToast) showToast(isUserCancellation ? 'Payment cancelled.' : 'Payment rejected or timed out.');
     }
   },
 
@@ -689,6 +725,15 @@ const transitionScreen = (from, to) => {
 };
 
 // --- Interactions ---
+window.setQuickMessage = (msg) => {
+  const textarea = document.getElementById('tip-message');
+  if (textarea) {
+    textarea.value = msg;
+    state.selectedMessage = msg;
+    if (window.triggerHaptic) triggerHaptic('light');
+  }
+};
+
 window.toggleInterest = (btn, interest) => {
   const index = state.selectedInterests.indexOf(interest);
   if (index > -1) {
